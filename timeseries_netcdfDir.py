@@ -1,12 +1,14 @@
 import netCDF4, os
 
+# Example file paths (windows) and variable, parameter
 src_path = r'C:/Users/username/Documents/netcdf_directory/'
 dst_path = r'C:/Users/username/Documents/'
-var = 'var_name'
+var = ['Qs_acc', 'Qsb_acc', 'Qsm_acc', 'Rainf_f_tavg', 'Rainf_tavg', 'RootMoist_inst', 'SoilTMP0_10cm_inst',
+       'SoilMoi40_100cm', 'SWE_inst', 'Tair_f_inst', 'Tveg_tavg']
 params = [.25, 1440, -179.875, 179.875, 600, -59.875, 89.875]
 
 # This function can be used to preprocess datasets
-def timeseries_netcdfDir(src_path, dst_path, var, params):
+def timeser_ncDir_1var(src_path, dst_path, var, params):
     """
     Dependencies: netCDF4, os
     Author: Riley Hales
@@ -16,7 +18,7 @@ def timeseries_netcdfDir(src_path, dst_path, var, params):
     Arguments:
         src_path: string path to the DIRECTORY containing the source files, include the / at the end
         dst_path: string path to the DIRECTORY where the combined timeseries should be saved
-        var: string name of the variable you want a timeseries for as recorded in the source files (the shortcode)
+        var: list of the variable names you want a timeseries for as recorded in the source files (the shortcode)
         params: a list of parameter settings
             resolution: the increment in degrees between latitude/longitude steps
             lon_size: size of the LONGITUDE dimension in your files. this depends on the resolution
@@ -45,7 +47,8 @@ def timeseries_netcdfDir(src_path, dst_path, var, params):
     lat_min = params[5]
     lat_max = params[6]
     print(params)
-    print("loaded parameters from list")
+    print("loaded parameters")
+    print("beginning to copy files for variable:", var)
 
     # list all the filed contained in the given source dir
     source_files = os.listdir(src_path)
@@ -138,4 +141,5 @@ def timeseries_netcdfDir(src_path, dst_path, var, params):
     print("program finished")
     return()
 
-timeseries_netcdfDir(src_path, dst_path, var, params)
+for variable in var:
+    timeser_ncDir_1var(src_path, dst_path, variable, params)
