@@ -1,14 +1,14 @@
 import netCDF4, os
 
 # Example file paths (windows) and variable, parameter
-src_path = r'C:/Users/username/Documents/netcdf_directory/'
-dst_path = r'C:/Users/username/Documents/'
-var = ['Qs_acc', 'Qsb_acc', 'Qsm_acc', 'Rainf_f_tavg', 'Rainf_tavg', 'RootMoist_inst', 'SoilTMP0_10cm_inst',
-       'SoilMoi40_100cm', 'SWE_inst', 'Tair_f_inst', 'Tveg_tavg']
+src_path = r'C:/path/to/files/'
+dst_path = r'C:/path/to/save/'
+var = ['list', 'of', 'variables']
 params = [.25, 1440, -179.875, 179.875, 600, -59.875, 89.875]
+compress = True
 
 # This function can be used to preprocess datasets
-def timeser_ncDir_1var(src_path, dst_path, var, params):
+def timeser_ncDir_1var(src_path, dst_path, var, params, compress):
     """
     Dependencies: netCDF4, os
     Author: Riley Hales
@@ -27,6 +27,7 @@ def timeser_ncDir_1var(src_path, dst_path, var, params):
             lat_size: size of the LATITUDE dimension in your files. this depends on the resolution
             lat_min: the smallest latitude value
             lat_max: the largest latitude value
+        compress: Boolean indicator for whether you want to compress or not. Optional, default is no compression
                 OPTIONAL: for metadata in the dataset
             todo some parameters so you can fill the metadata of the time step
     Results:
@@ -34,10 +35,9 @@ def timeser_ncDir_1var(src_path, dst_path, var, params):
     Known Bugs:
         The program loads timesteps in the alphabetical order it reads the files in. if you data is not in time and
             alphabetical order, your timeseries will be mismatched
-        If your input netcdfs use a different order/combination of time, lat, lon dimensions. The program will crash
-
-
+        If your input netcdfs use a different order/combination of time, lat, lon dimensions. The program will fail
     """
+
     # load all the conditions from the parameters
     resolution = params[0]
     lon_size = params[1]
@@ -76,8 +76,12 @@ def timeser_ncDir_1var(src_path, dst_path, var, params):
     print("the timesteps are", timelist)
 
     # create the latitude and longitude variables correctly 'lat' and 'lon'
-    timeseries.createVariable(varname='lat', datatype='f4', dimensions='lat')
-    timeseries.createVariable(varname='lon', datatype='f4', dimensions='lon')
+    if compress:
+        timeseries.createVariable(varname='lat', datatype='f4', dimensions='lat', zlib=True, shuffle=True)
+        timeseries.createVariable(varname='lon', datatype='f4', dimensions='lon', zlib=True, shuffle=True)
+    else:
+        timeseries.createVariable(varname='lat', datatype='f4', dimensions='lat')
+        timeseries.createVariable(varname='lon', datatype='f4', dimensions='lon')
     print("determining latitude steps")
     lat = lat_min
     lat_list = []
@@ -100,13 +104,18 @@ def timeser_ncDir_1var(src_path, dst_path, var, params):
     timeseries['lon'][:] = lon_list
 
     # create the variable the we want to make the time series for
-    timeseries.createVariable(varname=var, datatype='f4', dimensions=('lat', 'lon', 'time'))
+    if compress:
+        timeseries.createVariable(varname=var, datatype='f4', dimensions=('lat', 'lon', 'time'), zlib=True, shuffle=True)
+    else:
+        timeseries.createVariable(varname=var, datatype='f4', dimensions=('lat', 'lon', 'time'))
+
 
     # for every file in the folder, open file, assign variable variable data to current time step, next time step
     tstep = 0
     var_list = ['lat', 'lon']
     print("processing the chosen variable information")
     for file in source_files:
+
         # for each file in the folder, open the file
         source = netCDF4.Dataset(src_path + file)
         print("copying from file " + str(file))
@@ -141,5 +150,6 @@ def timeser_ncDir_1var(src_path, dst_path, var, params):
     print("program finished")
     return()
 
+
 for variable in var:
-    timeser_ncDir_1var(src_path, dst_path, variable, params)
+    timeser_ncDir_1var(src_path, dst_path, variable, params, compress)
