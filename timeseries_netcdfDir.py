@@ -1,14 +1,15 @@
 import netCDF4, os
 
 # Example file paths (windows) and variable, parameter
-src_path = r'C:/path/to/files/'
-dst_path = r'C:/path/to/save/'
+dir_path = r'C:/path/to/files/'
+save_dir_path = r'C:/path/to/save/'
 var = ['list', 'of', 'variables']
 params = [.25, 1440, -179.875, 179.875, 600, -59.875, 89.875]
 compress = True
 
+
 # This function can be used to preprocess datasets
-def timeser_ncDir_1var(src_path, dst_path, var, params, compress):
+def timeser_ncDir_1var(dir_path, save_dir_path, var, params, compress):
     """
     Dependencies: netCDF4, os
     Author: Riley Hales
@@ -16,8 +17,8 @@ def timeser_ncDir_1var(src_path, dst_path, var, params, compress):
     Description: Merges a directory of netcdfs each with data for 1 day into a properly formatted timeseries netcdf4.
         This function is meant for preprocessing purposes only and should not be called in the app.
     Arguments:
-        src_path: string path to the DIRECTORY containing the source files, include the / at the end
-        dst_path: string path to the DIRECTORY where the combined timeseries should be saved
+        dir_path: string path to the DIRECTORY containing the source files, include the / at the end
+        save_dir_path: string path to the DIRECTORY where the combined timeseries should be saved
         var: list of the variable names you want a timeseries for as recorded in the source files (the shortcode)
         params: a list of parameter settings
             resolution: the increment in degrees between latitude/longitude steps
@@ -51,10 +52,10 @@ def timeser_ncDir_1var(src_path, dst_path, var, params, compress):
     print("beginning to copy files for variable:", var)
 
     # list all the filed contained in the given source dir
-    source_files = os.listdir(src_path)
+    source_files = os.listdir(dir_path)
 
     # create the new netcdf
-    timeseries = netCDF4.Dataset(dst_path + var + '.nc', 'w', clobber=True, format='NETCDF4')
+    timeseries = netCDF4.Dataset(save_dir_path + var + '.nc', 'w', clobber=True, format='NETCDF4')
 
     # specify dimensions
     timeseries.createDimension('lat', lat_size)
@@ -117,7 +118,7 @@ def timeser_ncDir_1var(src_path, dst_path, var, params, compress):
     for file in source_files:
 
         # for each file in the folder, open the file
-        source = netCDF4.Dataset(src_path + file)
+        source = netCDF4.Dataset(dir_path + file)
         print("copying from file " + str(file))
         # set the global attributes, but only once
         if tstep < 1:
@@ -152,4 +153,4 @@ def timeser_ncDir_1var(src_path, dst_path, var, params, compress):
 
 
 for variable in var:
-    timeser_ncDir_1var(src_path, dst_path, variable, params, compress)
+    timeser_ncDir_1var(dir_path, save_dir_path, variable, params, compress)

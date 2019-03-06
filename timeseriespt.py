@@ -1,4 +1,4 @@
-def ts_plot(variable, coords, tperiod, datadir):
+def ts_plot(var, coords, tperiod, datadir):
     """
     Description: generates a timeseries for a given point and given variable defined by the user.
     Arguments: A dictionary object from the AJAX-ed JSON object that contains coordinates and the variable name.
@@ -19,7 +19,7 @@ def ts_plot(variable, coords, tperiod, datadir):
     nc_lats = dataset['lat'][:]
     adj_lon_ind = (numpy.abs(nc_lons - coords[0])).argmin()
     adj_lat_ind = (numpy.abs(nc_lats - coords[1])).argmin()
-    units = dataset[variable].__dict__['units']
+    units = dataset[var].__dict__['units']
     dataset.close()
 
     # extract values at each timestep
@@ -29,9 +29,9 @@ def ts_plot(variable, coords, tperiod, datadir):
         t_value = (dataset['time'].__dict__['begin_date'])
         t_step = datetime.datetime.strptime(t_value, "%Y%m%d")
         t_step = calendar.timegm(t_step.utctimetuple()) * 1000
-        for time, var in enumerate(dataset['time'][:]):
+        for time, variable in enumerate(dataset['time'][:]):
             # get the value at the point
-            val = float(dataset[variable][0, adj_lat_ind, adj_lon_ind].data)
+            val = float(dataset[var][0, adj_lat_ind, adj_lon_ind].data)
             values.append((t_step, val))
         dataset.close()
 
