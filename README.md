@@ -19,4 +19,4 @@ You give it a file and it has the commands written to view variables and dimensi
 You give it a file path and it returns a dictionary of the min/max values for every variable in the format {'name of variable': 'min,max'}
 
 ### timeseriespt.py
-you give it a coords variable and the directory containing the individual netCDF files (or coming soon: all the timesteps of a netCDF with many time steps for a variable). 
+At a given coords location, it creates a timeseries of points for a specific var from all the netCDF4 files in datadir for given time period (following the nasa GLDAS naming conventions) (or coming soon: all the timesteps of a netCDF with many time steps for a variable). 

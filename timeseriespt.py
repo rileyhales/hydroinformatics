@@ -4,7 +4,7 @@ def ts_plot(var, coords, tperiod, datadir):
     Arguments: A dictionary object from the AJAX-ed JSON object that contains coordinates and the variable name.
     Author: Riley Hales
     Dependencies: netcdf4, numpy, datetime, random
-    Last Updated: Oct 11 2018
+    Last Updated: 18 March 2018
     """
     import os, netCDF4, numpy, datetime, calendar
     values = []
@@ -25,7 +25,7 @@ def ts_plot(var, coords, tperiod, datadir):
     # extract values at each timestep
     for nc in files:
         # set the time value for each file
-        dataset = netCDF4.Dataset(path + '/' + nc, 'r')
+        dataset = netCDF4.Dataset(datadir + '/' + nc, 'r')
         t_value = (dataset['time'].__dict__['begin_date'])
         t_step = datetime.datetime.strptime(t_value, "%Y%m%d")
         t_step = calendar.timegm(t_step.utctimetuple()) * 1000
@@ -36,5 +36,5 @@ def ts_plot(var, coords, tperiod, datadir):
         dataset.close()
 
     return_items = [units, values]
-
+    print(return_items)
     return return_items
