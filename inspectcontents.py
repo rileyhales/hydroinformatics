@@ -1,8 +1,6 @@
-file_path = r''
-
 def show_contents(file_path):
     """
-
+    Uses the file at file_path to demonstrate how to access specific data and metadata elements of a netcdf4 dataset
     """
     import netCDF4, pprint
     data_obj = netCDF4.Dataset(file_path, 'r', clobber=False, diskless=True, persist=False)
