@@ -7,6 +7,7 @@ Each of these functions are written to accept the same possible parameters.
 * ***save_dir_path***: the path to a directory where you want to save the output files produced by the method you specified.
 * ***var***: the name of a variable that you want the function to focus on. This should be the name as it appears in the file, not a full/long name that is listed in the attributes.
 * ***coords***: a tuple that contains the locations of a point in (lat, lon) format.
+* ***rasterpath***: a string path to the raster dataset to be used in the function. Must be GeoTiff format in a geographic coordinate system (WGS 1984)
 
 ### timeseries_netcdfDir.py
 Give it a directory of netCDF4 files broken up by timestep and creates a timeseries of each variable based on parameters
@@ -19,4 +20,7 @@ You give it a file and it has the commands written to view variables and dimensi
 You give it a file path and it returns a dictionary of the min/max values for every variable in the format {'name of variable': 'min,max'}
 
 ### timeseriespt.py
-At a given coords location, it creates a timeseries of points for a specific var from all the netCDF4 files in datadir for given time period (following the nasa GLDAS naming conventions) (or coming soon: all the timesteps of a netCDF with many time steps for a variable). 
+At a given coords location, it creates a timeseries of points for a specific var from all the netCDF4 files in datadir for given time period (following the nasa GLDAS naming conventions) (or coming soon: all the timesteps of a netCDF with many time steps for a variable).
+
+### spatialaverage.py
+Contains a function to convert a netcdf array of variable information into a geotiff format raster. Then takes that geotiff raster and a shapefile with polygon boundaries, calculates the average of the data in the geotiff's band within the boundaries marked by the shapefile.
