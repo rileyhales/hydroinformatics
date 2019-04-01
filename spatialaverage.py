@@ -14,23 +14,23 @@ def nc_to_geotiff(file_path, var, save_dir_path):
     lat = nc_obj.variables['lat'][:]
     lon = nc_obj.variables['lon'][:]
 
-    # Create the array with the variable information at the size of
-    x = numpy.zeros((len(lat), len(lon)), float)
-    x[:, :] = var_data[:]
-
-    # calculate the geographic transform information
-    yorigin = lat.max()
-    xorigin = lon.min()
-    xres = lat[1] - lat[0]
-    yres = lon[1] - lon[0]
+    # format the array of information going to the tiff
+    x = numpy.asarray(var_data)[0, :, :]
 
     # Creates geotiff raster file (filepath, x-dimensions, y-dimensions, number of bands, datatype)
     geotiffdriver = gdal.GetDriverByName('GTiff')
     new_geotiff = geotiffdriver.Create(save_dir_path + 'geotiff.tif', len(lon), len(lat), 1, gdal.GDT_Float32)
 
-    # geotransform = (topleft x, x-width/spacing, 0, topleft y, 0, y-width/spacing)
+    # calculate the geographic transform information and set the projection
+    # geotransform = (topleft x, x-width/spacing, x-rotation angle, topleft y, y-rotation angle, y-width/spacing)
+    yorigin = lat.max()
+    xorigin = lon.min()
+    xres = lat[1] - lat[0]
+    yres = lon[1] - lon[0]
     new_geotiff.SetGeoTransform((xorigin, xres, 0, yorigin, 0, -yres))
-    new_geotiff.SetProjection('WGS 84')             # set the projection for the new geotiff
+
+    # Set the projection of the geotiff
+    new_geotiff.SetProjection('WGS84')             # set the projection for the new geotiff
 
     # actually write the data array to the tiff file and save it
     new_geotiff.GetRasterBand(1).WriteArray(x)               # write band to the raster (variable array)
@@ -68,6 +68,6 @@ def spatialaverage(rasterpath, shape_path):
     return mean
 
 
-nc_to_geotiff(r'/Users/rileyhales/Documents/sampledata/n41w112_30m/GLDAS_NOAH025_M.A201902.021.nc4', 'Tair_f_inst', r'/Users/rileyhales/Documents/sampledata/')
+nc_to_geotiff(r'/Users/rileyhales/Documents/sampledata/n41w112_30m/GLDAS_NOAH025_M.A201902.021.nc4', 'Tair_f_inst', r'/Users/rileyhales/Documents/nctools/')
 
-# spatialaverage(r'/Users/rileyhales/Documents/sampledata/n41w112_30m/n41w112_30m.tif', r'/Users/rileyhales/Documents/sampledata/shapefile/shapefile.shp')
+spatialaverage(r'/Users/rileyhales/Documents/nctools/geotiff.tif', r'/Users/rileyhales/Documents/sampledata/shapefile/shapefile.shp')
