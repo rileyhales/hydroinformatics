@@ -9,18 +9,16 @@ Each of these functions are written to accept the same possible parameters.
 * ***coords***: a tuple that contains the locations of a point in (lat, lon) format.
 * ***rasterpath***: a string path to the raster dataset to be used in the function. Must be GeoTiff format in a geographic coordinate system (WGS 1984)
 
-### timeseries_netcdfDir.py
-Give it a directory of netCDF4 files broken up by timestep and creates a timeseries of each variable based on parameters
-you specify. Supports compression.
-
 ### inspectcontents.py
 You give it a file and it has the commands written to view variables and dimensions and their attributes.
 
 ### variablebounds.py
 You give it a file path and it returns a dictionary of the min/max values for every variable in the format {'name of variable': 'min,max'}
 
-### timeseriespt.py
-At a given coords location, it creates a timeseries of points for a specific var from all the netCDF4 files in datadir for given time period (following the nasa GLDAS naming conventions) (or coming soon: all the timesteps of a netCDF with many time steps for a variable).
+### timeseries.py
+* ***ts_pt_plot***: At a given coords location, it creates a timeseries of points for a specific var from all the netCDF4 files in datadir for given time period (following the nasa GLDAS naming conventions) (or coming soon: all the timesteps of a netCDF with many time steps for a variable).
+* ***timeseries_netcdfDir.py***: Give it a directory of netCDF4 files broken up by timestep and creates a timeseries of each variable based on parameters
+you specify. Supports compression.
 
 ### geoprocessing.py
 Contains python functions for simple geoprocessing operatiosn you need to perform on netcdf formatted data.
