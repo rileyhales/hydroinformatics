@@ -22,5 +22,12 @@ You give it a file path and it returns a dictionary of the min/max values for ev
 ### timeseriespt.py
 At a given coords location, it creates a timeseries of points for a specific var from all the netCDF4 files in datadir for given time period (following the nasa GLDAS naming conventions) (or coming soon: all the timesteps of a netCDF with many time steps for a variable).
 
-### spatialaverage.py
-Contains a function to convert a netcdf array of variable information into a geotiff format raster. Then takes that geotiff raster and a shapefile with polygon boundaries, calculates the average of the data in the geotiff's band within the boundaries marked by the shapefile.
+### geoprocessing.py
+Contains python functions for simple geoprocessing operatiosn you need to perform on netcdf formatted data.
+* ***spatialaverage.py***: Intended to be used in conjunction with netcdf_to_geotiff.py functions. Contains a function that takes a geotiff raster and a shapefile with polygon boundaries, calculates the average of the data in the geotiff's band within the boundaries marked by the shapefile.
+
+### netcdf_to_geotiff.py
+Contains functions for taking netcdfs and creating geotiffs out of them in the following permutations:
+* ***nc1_to_gtiff***: Accepts a single netcdf file and writing the data from 1 variable to a 1 band geotiff.
+* ***ncAll_to_gtiff***: Accepts a single netcdf file and writes the data from all variables to a geotiff with as many bands as variables.
+* ***ncDir_to_MBgtiff***: Accepts a file path to a directory of netcdf files representing different time steps of the same data and combines them into a single geotiff where each timestep is in a different band.
