@@ -1,10 +1,9 @@
 def ts_pt_plot(var, coords, tperiod, datadir):
     """
     Description: generates a timeseries for a given point and given variable defined by the user.
-    Arguments: A dictionary object from the AJAX-ed JSON object that contains coordinates and the variable name.
-    Author: Riley Hales
-    Dependencies: netcdf4, numpy, datetime, random
-    Last Updated: 18 March 2018
+    Params: A dictionary object from the AJAX-ed JSON object that contains coordinates and the variable name.
+    Author: Riley Hales, May 2018
+    Dependencies: os, netcdf4, numpy, datetime, calendar
     """
     import os
     import netCDF4
@@ -46,9 +45,6 @@ def ts_pt_plot(var, coords, tperiod, datadir):
 # This function can be used to preprocess datasets
 def timeser_ncDir_1var(dir_path, save_dir_path, var, params, compress):
     """
-    Dependencies: netCDF4, os
-    Author: Riley Hales
-    Revised Date: October 4 2018
     Description: Merges a directory of netcdfs each with data for 1 day into a properly formatted timeseries netcdf4.
         This function is meant for preprocessing purposes only and should not be called in the app.
     Arguments:
@@ -66,11 +62,14 @@ def timeser_ncDir_1var(dir_path, save_dir_path, var, params, compress):
         compress: Boolean indicator for whether you want to compress or not. Optional, default is no compression
                 OPTIONAL: for metadata in the dataset
             todo some parameters so you can fill the metadata of the time step
-    Results:
+    Dependencies: netCDF4, os
+    Author: Riley Hales
+    Revised Date: October 4 2018
+    Returns:
         Saves a timeseries in .nc format to the directory specified named the same as the variable it displays
     Known Bugs:
-        The program loads timesteps in the alphabetical order it reads the files in. if you data is not in time and
-            alphabetical order, your timeseries will be mismatched
+        The program loads timesteps in the alphabetical order it reads the files in. if your data is not in time and
+            alphabetical order, your timeseries will be out of order
         If your input netcdfs use a different order/combination of time, lat, lon dimensions. The program will fail
     """
 

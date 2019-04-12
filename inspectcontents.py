@@ -27,3 +27,26 @@ def show_contents(file_path):
     data_obj.close()
 
     return
+
+
+def variablebounds(file_path):
+    """
+    Description: Makes a dictionary of variable names with a string 'min,max' of the smallest and largest values
+    Params: A dictionary object from the AJAX-ed JSON object that contains coordinates and the variable name.
+    Author: Riley Hales, 2019
+    Dependencies: netcdf4, numpy
+    """
+    import netCDF4
+    import numpy
+    bounds = {}
+
+    data_obj = netCDF4.Dataset(file_path, 'r',
+                               clobber=False, diskless=True, persist=False)
+    print(data_obj)
+
+    for variable in data_obj.variables.keys():
+        min = numpy.min(data_obj[variable][:])
+        max = numpy.max(data_obj[variable][:])
+        bounds[variable] = str(min) + ',' + str(max)
+    print(bounds)
+    return bounds

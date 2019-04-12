@@ -1,16 +1,21 @@
-def spatialaverage(rasterpath, shape_path):
+def rastermask_average_rasterio(rasterpath, shape_path):
     """
-    Spatial average returns the arithmetic mean of the values in a netcdf raster within the boundaries of a shapefile
+    Description: A function that masks a raster by the extents of a shapefile and returns the arithmetic mean of the
+        raster's values in that area. Assumes the shapefile and raster are in the same geographic coordinate system
+    Dependencies: fiona, rasterio, numpy
+    Params: View README.md
+    Returns: computer mean value
+    Author: Riley Hales, RCH Engineering, April 2019
     """
     import fiona
     import rasterio
     from rasterio.mask import mask
-    from rasterio.plot import show
     import numpy
 
     # read the raster into a rasterio object
     raster_obj = rasterio.open(rasterpath)
-    rasterio.plot.show(raster_obj)
+    # from rasterio.plot import show
+    # rasterio.plot.show(raster_obj) # optional command to show a plot of the new raster
 
     # read the shapefile information into a fiona object
     shp_object = fiona.open(shape_path, 'r')
@@ -27,4 +32,27 @@ def spatialaverage(rasterpath, shape_path):
     return mean
 
 
-spatialaverage(r'/Users/rileyhales/Documents/nctools/geotiff.tif', r'/Users/rileyhales/Documents/sampledata/shapefilegcs/shapefile_Project.shp')
+def rastermask_average_gdal(rasterpath, shapepath):
+    """
+    Description: A function to mask/clip a raster by the boundaries of a shapefile and computer the average value of the
+        resulting raster
+    Dependencies: gdal, gdalnumeric
+    Params: View README.md
+    Returns: computer mean value
+    Author: Riley Hales, RCH Engineering, April 2019
+    """
+    import gdal
+    import gdalnumeric
+
+    # open the raster as a gdal object and a gdalnumeric array
+    raster = gdal.Open(rasterpath)
+    raster_array = gdalnumeric.LoadFile(rasterpath)
+    geotransform = raster.GetGeoTransform()
+    projection = raster.GetProjection()
+
+    mean = 0
+
+    return mean
+
+
+rastermask_average_rasterio(r'/Users/rileyhales/Documents/nctools/geotiff.tif', r'/Users/rileyhales/Documents/sampledata/shapefilegcs/shapefile_Project.shp')
