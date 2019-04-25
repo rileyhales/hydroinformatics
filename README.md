@@ -30,3 +30,7 @@ Contains functions for taking netcdfs and creating geotiffs out of them in the f
 * ***nc1_to_gtiff***: Accepts a single netcdf file and writing the data from 1 variable to a 1 band geotiff.
 * ***ncAll_to_gtiff***: Accepts a single netcdf file and writes the data from all variables to a geotiff with as many bands as variables.
 * ***ncDir_to_MBgtiff***: Accepts a file path to a directory of netcdf files representing different time steps of the same data and combines them into a single geotiff where each timestep is in a different band.
+
+### postprocessing.py
+Contains functions to take netcdfs from a raw to a usable form 
+* ***wms_lis_forecast***: Takes a LIS forecast output netcdf and turns it into a WMS recognizable format. Not functional.

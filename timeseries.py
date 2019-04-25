@@ -1,6 +1,8 @@
 def ts_pt_plot(var, coords, tperiod, datadir):
     """
-    Description: generates a timeseries for a given point and given variable defined by the user.
+    Description: generates a timeseries for a given point and given variable defined by the user. This works for the
+        netcdfs formatted in the GLDAS netcdf format where the latitude and longitude variables are 1 dimensional lists
+        of the latitudes and longitudes available for the variables.
     Params: A dictionary object from the AJAX-ed JSON object that contains coordinates and the variable name.
     Author: Riley Hales, May 2018
     Dependencies: os, netcdf4, numpy, datetime, calendar
@@ -130,6 +132,7 @@ def timeser_ncDir_1var(dir_path, save_dir_path, var, params, compress):
         timeseries.createVariable(varname='lat', datatype='f4', dimensions='lat')
         timeseries.createVariable(varname='lon', datatype='f4', dimensions='lon')
     print("determining latitude steps")
+    # lat = original['lat'][:].argmin() and .argmax()is MUCH longer but fully general
     lat = lat_min
     lat_list = []
     while lat <= lat_max:
