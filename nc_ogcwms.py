@@ -1,13 +1,19 @@
-def wms_lis_forecast(dir_path, save_dir_path, compress):
+def nc_georeference(dir_path, save_dir_path, compress):
     """
-
-    :param dir_path:
-    :param save_dir_path:
-    :param compress:
-    :return:
+    Description: Intended to make a THREDDS data server compatible netcdf file out of an incorrectly structured
+        netcdf file.
+    Author: Riley Hales, 2019
+    Dependencies: netCDF4, os, datetime
+    THREDDS Documentation specifies that an appropriately georeferenced file should
+    1. Has Coordinate Variables- 2 1D variables, lat lon, which contain the lat/lon values of the grid points.
+        Each variable requires only 1 Dimension.
+    2. Has 2 dimensions, lat lon, that are the Coordinate Dimensions corresponding to the Coordinate Variables.
+    3. Each variable requires the Coordinate Dimensions.
+    3. Has global attributes called _Coordinate**
     """
     import netCDF4
     import os
+    import datetime
 
     files = os.listdir(dir_path)
     files = [file for file in files if file.startswith('LIS_HIST_')]
@@ -55,6 +61,10 @@ def wms_lis_forecast(dir_path, save_dir_path, compress):
         for dimension in dimensions:
             duplicate.createDimension(dimension, dimensions[dimension])
 
+        for dim in duplicate.dimensions.keys():
+            print(dim)
+            print(duplicate.dimensions[dim])
+
         # 'Manually' create the dimensions that need to be set carefully
         if compress:
             duplicate.createVariable(varname='lat', datatype='f4', dimensions='lat', zlib=True, shuffle=True)
@@ -80,6 +90,7 @@ def wms_lis_forecast(dir_path, save_dir_path, compress):
 
         # copy the rest of the variables
         for variable in variables:
+            print('Copying variable ' + variable)
             # check to use the lat/lon dimension names
             dimension = original[variable].dimensions
             if 'north_south' in dimension:
@@ -91,6 +102,10 @@ def wms_lis_forecast(dir_path, save_dir_path, compress):
                 dimension = list(dimension)
                 dimension.remove('east_west')
                 dimension.append('lon')
+                dimension = tuple(dimension)
+            if 'time' not in dimension and variable not in ['lat', 'lon', 'ensemble']:
+                dimension = list(dimension)
+                dimension.append('time')
                 dimension = tuple(dimension)
             # create the variable
             if compress:
@@ -104,6 +119,14 @@ def wms_lis_forecast(dir_path, save_dir_path, compress):
             # copy the arrays of data
             duplicate[variable][:] = original[variable][:]
 
+            if variable == 'time':
+                duplicate[variable][:] = [0]
+                duplicate[variable].time_increment = 1440
+                end_date = datetime.datetime.strptime(duplicate[variable].begin_date, "%Y%m%d") + datetime.timedelta(days=1)
+                duplicate[variable].end_date = end_date.strftime("%Y%m%d")
+                duplicate[variable].end_time = "000000"
+            print(duplicate[variable])
+
         # close the files and start again
         original.close()
         duplicate.sync()
@@ -112,4 +135,4 @@ def wms_lis_forecast(dir_path, save_dir_path, compress):
     return
 
 
-wms_lis_forecast(r'/Users/rileyhales/thredds/forecasts/', r'/Users/rileyhales/thredds/sampleoutputs/', compress=True)
+nc_georeference(r'/Users/rileyhales/thredds/forecasts/', r'/Users/rileyhales/thredds/sampleoutputs/', compress=True)
