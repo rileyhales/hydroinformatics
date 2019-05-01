@@ -31,11 +31,12 @@ def nc_georeference(dir_path, save_dir_path, compress):
         dimensions[dimension] = netcdf_obj.dimensions[dimension].size
     dimensions['lat'] = dimensions['north_south']
     dimensions['lon'] = dimensions['east_west']
-    del dimensions['north_south'], dimensions['east_west']
+    del dimensions['north_south'], dimensions['east_west']  # , dimensions['ensemble']
+    dimensions['time'] = 7
 
     # get a list of the variables and remove the one's i'm going to 'manually' correct
     variables = netcdf_obj.variables
-    del variables['lat'], variables['lon']
+    del variables['lat'], variables['lon']  # , variables['ensemble']
     variables = variables.keys()
 
     # min lat and lon and the interval between values
@@ -103,10 +104,12 @@ def nc_georeference(dir_path, save_dir_path, compress):
                 dimension.remove('east_west')
                 dimension.append('lon')
                 dimension = tuple(dimension)
-            if 'time' not in dimension and variable not in ['lat', 'lon', 'ensemble']:
-                dimension = list(dimension)
-                dimension.append('time')
-                dimension = tuple(dimension)
+            # if 'ensemble' in dimension:
+            #     dimension = list(dimension)
+            #     dimension.append('time')
+            #     dimension.remove('ensemble')
+            #     dimension = tuple(dimension)
+
             # create the variable
             if compress:
                 duplicate.createVariable(varname=variable, datatype='f4', dimensions=dimension, zlib=True, shuffle=True)
@@ -117,15 +120,10 @@ def nc_georeference(dir_path, save_dir_path, compress):
                 if attr != "_FillValue":
                     duplicate[variable].setncattr(attr, original[variable].__dict__[attr])
             # copy the arrays of data
-            duplicate[variable][:] = original[variable][:]
-
             if variable == 'time':
-                duplicate[variable][:] = [0]
-                duplicate[variable].time_increment = 1440
-                end_date = datetime.datetime.strptime(duplicate[variable].begin_date, "%Y%m%d") + datetime.timedelta(days=1)
-                duplicate[variable].end_date = end_date.strftime("%Y%m%d")
-                duplicate[variable].end_time = "000000"
-            print(duplicate[variable])
+                duplicate[variable][:] = [1, 2, 3, 4, 5, 6, 7]
+            else:
+                duplicate[variable][:] = original[variable][:]
 
         # close the files and start again
         original.close()
