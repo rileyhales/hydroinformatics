@@ -10,7 +10,8 @@ Most functions require at least one of the following parameters:
 * ***coords***: a tuple that contains the locations of a point in (lat, lon) format.
 
 Some less common parameters include:
-* ***rasterpath***: a string path to the raster dataset to be used in the function. Must be GeoTiff format in a geographic coordinate system (WGS 1984)
+* ***baserasterpath***: a string path to the raster dataset to be used in the function. Must be GeoTiff format in a geographic coordinate system (WGS 1984)
+* ***outrasterpath***: a string path where you want to save the raster dataset created by the function. Must be GeoTiff format in a geographic coordinate system (WGS 1984)
 
 ### inspectcontents.py
 * ***show_contents***: You give it a file and it has the commands written to view variables and dimensions and their attributes.
@@ -23,7 +24,7 @@ Some less common parameters include:
 ### geoprocessing.py
 Contains python functions for simple geoprocessing operatiosn you need to perform on netcdf formatted data.
 * ***rastermask_average_rasterio***: Uses the rasterio package to compute the average of a geotiff within the extents of a bounding shapefile. Intended to be used in conjunction with netcdf_to_geotiff.py
-* ***rastermask_average_gdal***: Uses the GDAL package to compute the average of a geotiff within the extents of a bounding shapefile. Intended to be used in conjunction with netcdf_to_geotiff.py
+* ***rastermask_average_gdalwarp***: Uses the GDAL package to compute the average of a geotiff within the extents of a bounding shapefile. Intended to be used in conjunction with netcdf_to_geotiff.py
 
 ### netcdf_to_geotiff.py
 Contains functions for taking netcdfs and creating geotiffs out of them in the following permutations:

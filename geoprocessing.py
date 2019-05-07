@@ -12,7 +12,7 @@ def rastermask_average_rasterio(rasterpath, shape_path):
     from rasterio.mask import mask
     import numpy
 
-    # read the raster into a rasterio object
+    # read the raster (eg a tiff) into a rasterio object
     raster_obj = rasterio.open(rasterpath)
     # from rasterio.plot import show
     # rasterio.plot.show(raster_obj) # optional command to show a plot of the new raster
@@ -32,6 +32,34 @@ def rastermask_average_rasterio(rasterpath, shape_path):
     return mean
 
 
+def rastermask_average_gdalwarp(rasterpath, shapepath):
+    """
+    Description: A function to mask/clip a raster by the boundaries of a shapefile and computer the average value of the
+        resulting raster
+    Dependencies: gdal, gdalnumeric, numpy
+    Params: View README.md
+    Returns: mean value of an array within a shapefile's boundaries
+    Author: Riley Hales, RCH Engineering, April 2019
+    """
+    import gdal
+    import gdalnumeric
+    import numpy
+
+    inraster = gdal.Open(rasterpath)
+    outraster = r'/Users/rileyhales/Documents/sampledata/gldalwarp.tif'  # your output raster file
+    clippedraster = gdal.Warp(outraster, inraster, format='GTiff', cutlineDSName=shapepath, dstNodata=numpy.nan)
+    array = gdalnumeric.DatasetReadAsArray(clippedraster)
+    array = array.flatten()
+    array = array[~numpy.isnan(array)]
+    mean = array.mean()
+    print(mean)
+
+    return mean
+
+
+rastermask_average_gdalwarp(r'/Users/rileyhales/Documents/sampledata/gldasgeotiff/gldasgeotiff.tif', r'/Users/rileyhales/Documents/sampledata/shapefilegcs/shapefile_Project.shp')
+
+
 def rastermask_average_gdal(rasterpath, shapepath):
     """
     Description: A function to mask/clip a raster by the boundaries of a shapefile and computer the average value of the
@@ -42,18 +70,16 @@ def rastermask_average_gdal(rasterpath, shapepath):
     Author: Riley Hales, RCH Engineering, April 2019
     """
     import gdal
+    import PIL.Image as Image
+    import PIL.ImageDraw as ImageDraw
     import gdalnumeric
     import ogr
+    import os
 
     # open the raster as a gdal object to get metadata from it
-    raster = gdal.Open(rasterpath)
-    print(type(raster))
-    geotransform = raster.GetGeoTransform()
-    print(geotransform)
-    print(type(geotransform))
-    projection = raster.GetProjection()
-    print(projection)
-    print(type(projection))
+    raster = gdal.Open(rasterpath)              # a gdal Dataset object
+    geotransform = raster.GetGeoTransform()     # tuple (minX, Xstep, row-rotation, maxY, column rotation, Ystep)
+    projection = raster.GetProjection()         # WKT string (print it)
     del raster
 
     # open the raster as an array, the geoprocessing math is done on the array
@@ -61,60 +87,50 @@ def rastermask_average_gdal(rasterpath, shapepath):
 
     # create the masking raster from the shapefile
     mask_shp = ogr.Open(shapepath)
+    layer = mask_shp.GetLayer(os.path.split(os.path.splitext(shapepath)[0])[1])
+    polygon = layer.GetNextFeature()    # the polygon masking information ogr.Feature object
+    extents = layer.GetExtent()         # tuple (minX, maxX, minY, maxY)
 
-    mean = 0
+    # Index of points = distance between upperleft x,y and chosen x,y divided by step length
+    min_x_index = int(abs(geotransform[0] - extents[0])/geotransform[1])
+    max_y_index = int(abs(geotransform[3] - extents[3])/geotransform[5])
+    max_x_index = int(abs(geotransform[0] - extents[1])/geotransform[1])
+    min_y_index = int(abs(geotransform[3] - extents[2])/geotransform[5])
+    # slice the raster array to contain only the data in the extents of the shapefile
+    clip = raster_array[min_y_index:max_y_index, min_x_index:max_x_index]
+    print(clip)
+    print(clip.shape)
 
-    return mean
+    def world2Pixel(geoMatrix, x, y):
+        """
+        Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate
+        the pixel location of a geospatial coordinate
+        """
+        ulX = geoMatrix[0]
+        ulY = geoMatrix[3]
+        xDist = geoMatrix[1]
+        yDist = geoMatrix[5]
+        rtnX = geoMatrix[2]
+        rtnY = geoMatrix[4]
+        pixel = int((x - ulX) / xDist)
+        line = int((ulY - y) / xDist)
+        return pixel, line
 
-
-rastermask_average_gdal(r'/Users/rileyhales/Documents/sampledata/gldasgeotiff/gldasgeotiff.tif')
-
-"""
-def main( shapefile_path, raster_path ):
-    # Create an OGR layer from a boundary shapefile
-    shapef = ogr.Open(shapefile_path)
-    lyr = shapef.GetLayer( os.path.split( os.path.splitext( shapefile_path )[0] )[1] )
-    poly = lyr.GetNextFeature()
-
-    # Map points to pixels for drawing the
-    # boundary on a blank 8-bit,
-    # black and white, mask image.
     points = []
     pixels = []
-    geom = poly.GetGeometryRef()
+    geom = polygon.GetGeometryRef()
     pts = geom.GetGeometryRef(0)
     for p in range(pts.GetPointCount()):
-      points.append((pts.GetX(p), pts.GetY(p)))
+        points.append((pts.GetX(p), pts.GetY(p)))
     for p in points:
-      pixels.append(world2Pixel(geoTrans, p[0], p[1]))
-    rasterPoly = Image.new("L", (pxWidth, pxHeight), 1)
+        pixels.append(world2Pixel(geotransform, p[0], p[1]))
+    print(pixels)
+    rasterPoly = Image.new("L", (max_x_index - min_x_index, max_y_index - min_y_index), 1)
     rasterize = ImageDraw.Draw(rasterPoly)
     rasterize.polygon(pixels, 0)
-    mask = imageToArray(rasterPoly)
 
-    # Clip the image using the mask
-    clip = gdalnumeric.choose(mask, (clip, 0)).astype(gdalnumeric.uint8)
+    mask = gdalnumeric.fromstring(rasterPoly.tostring(), 'b')
+    mask.shape = rasterPoly.im.size[1], rasterPoly.im.size[0]
+    print(mask)
 
-    # Convert the layer extent to image pixel coordinates
-    minX, maxX, minY, maxY = lyr.GetExtent()
-    ulX, ulY = world2Pixel(geoTrans, minX, maxY)
-    lrX, lrY = world2Pixel(geoTrans, maxX, minY)
-
-    # Calculate the pixel size of the new image
-    pxWidth = int(lrX - ulX)
-    pxHeight = int(lrY - ulY)
-
-    clip = srcArray[:, ulY:lrY, ulX:lrX]
-
-    #
-    # EDIT: create pixel offset to pass to new image Projection info
-    #
-    xoffset =  ulX
-    yoffset =  ulY
-    print "Xoffset, Yoffset = ( %f, %f )" % ( xoffset, yoffset )
-
-    # Create a new geomatrix for the image
-    geoTrans = list(geoTrans)
-    geoTrans[0] = minX
-    geoTrans[3] = maxY
-"""
+    return
