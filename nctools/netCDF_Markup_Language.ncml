@@ -18,11 +18,15 @@
         <netcdf location="raw/GLDAS_NOAH025_M.A201901.021.nc4"/>
 
         <!-- Use a scan to look everywhere in a directory but not subdirectories -->
-        <scan location="raw/">
-            <!-- Filter by the names of the files. this thanks -->
+        <scan location="name_a_directory/ (relative or absolute file path)">
+            <!-- Use wildcards to filter but you can't combine the filtering logic with and/or etc-->
             <filter>
                 <include wildcard="GLDAS_NOAH025_M.A2019*"/>
             </filter>
         </scan>
+
+        <!-- Use a scan and specify starts with or ends with -->
+        <scan location="name_a_directory/ (a relative file path)" prefix="gldas" suffix=".nc"></scan>
+
     </aggregation>
 </netcdf>

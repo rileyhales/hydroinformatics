@@ -2,7 +2,7 @@
 A collection of functions for viewing and manipulating netCDF files.  
 Copyright [Riley Hales](https://www.rileyhales.com), RCH Engineering, 2018
 
-## Making a netcdf OGC Compliant
+## Making a netcdf OGC Services Compliant
 A netcdf what complies with the Common Data Model (CDM) standards can supply an OGC service with data. For full details see [this UCAR page describing the CDM](https://www.unidata.ucar.edu/software/thredds/current/netcdf-java/CDM/).
 
 In summary, some important features necessary for a netcdf to become compliant are:
@@ -10,18 +10,14 @@ In summary, some important features necessary for a netcdf to become compliant a
 2. 2 Coordinate Variables, lat and lon, whose arrays contain the lat/lon values of the grid points.
     These variables only require the corresponding lat or lon dimension.
 3. 1 time dimension whose length is the number of time steps
-4. 1 time variable whose array contains the difference in time between steps using the units given in the metadata.
+4. 1 time variable whose array contains the difference in time between steps using the units given in the metadata. The begin_date attribute must specify the time in YYYYMMDDHH format.
 5. Each variable requires the the time and Coordinate Dimensions, in that order (time, lat, lon)
 6. Each variable has the long_name, units, standard_name property values correct
 7. The variable property coordinates = "lat lon" or else is blank/doesn't exist
 8. The array of variable information as exactly the same dimensions as the x/y coordinate variables.
 
 ## Using NetCDF Markup Language
-You can aggregate date from many NetCDF's on the fly with Thredds and Panoply and other softwares using netcdf markup language, .ncml. Some examples are in the ncml document in this directory. A more full explanation of ncml is at [this UCAR page](https://www.unidata.ucar.edu/software/thredds/current/netcdf-java/ncml/).
-
-You can also:
-1. Google examples of using netcdf markup language 
-2. 
+You can aggregate date from many NetCDF's on the fly with Thredds and Panoply and other softwares using netcdf markup language, .ncml. Some examples are in the ncml document in this directory. A more full explanation of ncml is at [this UCAR page](https://www.unidata.ucar.edu/software/thredds/current/netcdf-java/ncml/) and you can google examples.
 
 ## Notes about these functions
 Most functions require at least one of the following parameters:
