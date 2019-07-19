@@ -1,4 +1,4 @@
-import netCDF4, os, datetime
+import netCDF4, os
 
 
 def nc_georeference(dir_path, save_dir_path, compress):
@@ -29,25 +29,28 @@ def nc_georeference(dir_path, save_dir_path, compress):
     dimensions = {}
     for dimension in netcdf_obj.dimensions.keys():
         dimensions[dimension] = netcdf_obj.dimensions[dimension].size
-    dimensions['lat'] = dimensions['latitude']
-    dimensions['lon'] = dimensions['longitude']
+        if dimension == 'latitude' or dimension == 'north_south':
+            dimensions['lat'] = dimensions[dimension]
+            del dimensions[dimension]
+        elif dimension == 'longitude' or dimension == 'east_west':
+            dimensions['lon'] = dimensions[dimension]
+            del dimensions[dimension]
     dimensions['time'] = 1
-    del dimensions['latitude'], dimensions['longitude']
 
     # get a list of the variables and remove the one's i'm going to 'manually' correct
     variables = netcdf_obj.variables
-    del variables['valid_time'], variables['step'], variables['latitude'], variables['longitude'], variables['surface']
+    for variable in ['valid_time', 'step', 'latitude', 'longitude', 'surface', 'lat', 'lon']:
+        try:
+            del variables[variable]
+        except AttributeError:
+            pass
     variables = variables.keys()
 
-    # min lat and lon and the interval between values (these are static values
-    lat_min = -90
-    lon_min = -180
-    lat_step = .25
-    lon_step = .25
-    # lat_min = netcdf_obj.__dict__['SOUTH_WEST_CORNER_LAT']
-    # lon_min = netcdf_obj.__dict__['SOUTH_WEST_CORNER_LON']
-    # lat_step = netcdf_obj.__dict__['DX']
-    # lon_step = netcdf_obj.__dict__['DY']
+    # min lat and lon and the interval between values (these are static values)
+    lat_min = 8
+    lon_min = 58
+    lat_step = .05
+    lon_step = .05
 
     netcdf_obj.close()
 
@@ -81,17 +84,17 @@ def nc_georeference(dir_path, save_dir_path, compress):
         duplicate['lon'][:] = lon_list
 
         # set the attributes for lat and lon (except fill value, you just can't copy it)
-        for attr in original['latitude'].__dict__:
+        for attr in original['lat'].__dict__:
             if attr != "_FillValue":
-                duplicate['lat'].setncattr(attr, original['latitude'].__dict__[attr])
-        for attr in original['longitude'].__dict__:
+                duplicate['lat'].setncattr(attr, original['lat'].__dict__[attr])
+        for attr in original['lon'].__dict__:
             if attr != "_FillValue":
-                duplicate['lon'].setncattr(attr, original['longitude'].__dict__[attr])
+                duplicate['lon'].setncattr(attr, original['lon'].__dict__[attr])
 
         # copy the rest of the variables
-        date = 'this is where you have controls for setting the dates'
-        timestep = 1
-        timedelta = 'add an expression for changing back and forth'
+        date = '201906'
+        timestep = 0
+        timedelta = 1
         for variable in variables:
             # check to use the lat/lon dimension names
             dimension = original[variable].dimensions
@@ -100,15 +103,32 @@ def nc_georeference(dir_path, save_dir_path, compress):
                 dimension.remove('latitude')
                 dimension.append('lat')
                 dimension = tuple(dimension)
+            if 'north_south' in dimension:
+                dimension = list(dimension)
+                dimension.remove('north_south')
+                dimension.append('lat')
+                dimension = tuple(dimension)
             if 'longitude' in dimension:
                 dimension = list(dimension)
                 dimension.remove('longitude')
                 dimension.append('lon')
                 dimension = tuple(dimension)
+            if 'east_west' in dimension:
+                dimension = list(dimension)
+                dimension.remove('east_west')
+                dimension.append('lon')
+                dimension = tuple(dimension)
+            if 'time' not in dimension:
+                dimension = list(dimension)
+                dimension = ['time'] + dimension
+                dimension = tuple(dimension)
             if len(dimension) == 2:
                 dimension = ('time', 'lat', 'lon')
             if variable == 'time':
                 dimension = ('time',)
+
+            print(variable)
+            print(dimension)
 
             # create the variable
             if compress:
@@ -134,17 +154,23 @@ def nc_georeference(dir_path, save_dir_path, compress):
             else:
                 duplicate[variable][:] = original[variable][:]
                 duplicate[variable].axis = "lat lon"
-            duplicate[variable].long_name = original[variable].long_name
-            duplicate[variable].begin_date = date
-            duplicate[variable].units = original[variable].unit
 
-        # close the files, delete the one you just did, start again
+            duplicate[variable].begin_date = date
+            try:
+                duplicate[variable].long_name = original[variable].long_name
+            except AttributeError:
+                duplicate[variable].long_name = variable
+            try:
+                duplicate[variable].units = original[variable].units
+            except AttributeError:
+                duplicate[variable].units = 'unknown units'
+
+        # close the file then start again
         original.close()
         duplicate.sync()
         duplicate.close()
-        os.remove(openpath)
 
     return
 
 
-nc_georeference(r'/Users/rileyhales/thredds/forecasts/', r'/Users/rileyhales/thredds/sampleoutputs/', compress=True)
+nc_georeference(r'/path/to/data/', r'/path/to/save', compress=True)

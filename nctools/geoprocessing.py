@@ -41,6 +41,8 @@ def rastermask_average_gdalwarp(rasterpath, shapepath):
     Returns: mean value of an array within a shapefile's boundaries
     Author: Riley Hales, RCH Engineering, April 2019
     """
+    # rastermask_average_gdalwarp(r'/Users/rileyhales/Documents/sampledata/gldasgeotiff/gldasgeotiff.tif',
+    #                             r'/Users/rileyhales/Documents/sampledata/shapefilegcs/shapefile_Project.shp')
     import gdal
     import gdalnumeric
     import numpy
@@ -55,9 +57,6 @@ def rastermask_average_gdalwarp(rasterpath, shapepath):
     print(mean)
 
     return mean
-
-
-rastermask_average_gdalwarp(r'/Users/rileyhales/Documents/sampledata/gldasgeotiff/gldasgeotiff.tif', r'/Users/rileyhales/Documents/sampledata/shapefilegcs/shapefile_Project.shp')
 
 
 def rastermask_average_gdal(rasterpath, shapepath):
