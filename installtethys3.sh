@@ -12,6 +12,8 @@ fi
 echo "# Tethys Platform" >> ~/${BASHPROFILE}
 echo "alias t='conda activate tethys'" >> ~/${BASHPROFILE}
 echo "alias tms='tethys manage start'" >> ~/${BASHPROFILE}
+echo "alias tstart='tethys db start'" >> ~/${BASHPROFILE}
+echo "alias tstop='tethys db stop'" >> ~/${BASHPROFILE}
 
 # initialize tethys settings and databases
 conda activate tethys

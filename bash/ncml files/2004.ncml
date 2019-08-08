@@ -1,0 +1,21 @@
+<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2">
+    <variable name="time" type="int" shape="time">
+        <attribute name="units" value="months since 2004-01-01 00:00"/>
+        <attribute name="_CoordinateAxisType" value="Time" />
+            <values start="0" increment="1" />
+    </variable>
+    <aggregation dimName="time" type="joinExisting" recheckEvery="1 day">
+        <netcdf location="raw/GLDAS_NOAH025_M.A200401.021.nc4"/>
+        <netcdf location="raw/GLDAS_NOAH025_M.A200402.021.nc4"/>
+        <netcdf location="raw/GLDAS_NOAH025_M.A200403.021.nc4"/>
+        <netcdf location="raw/GLDAS_NOAH025_M.A200404.021.nc4"/>
+        <netcdf location="raw/GLDAS_NOAH025_M.A200405.021.nc4"/>
+        <netcdf location="raw/GLDAS_NOAH025_M.A200406.021.nc4"/>
+        <netcdf location="raw/GLDAS_NOAH025_M.A200407.021.nc4"/>
+        <netcdf location="raw/GLDAS_NOAH025_M.A200408.021.nc4"/>
+        <netcdf location="raw/GLDAS_NOAH025_M.A200409.021.nc4"/>
+        <netcdf location="raw/GLDAS_NOAH025_M.A200410.021.nc4"/>
+	    <netcdf location="raw/GLDAS_NOAH025_M.A200411.021.nc4"/>
+	    <netcdf location="raw/GLDAS_NOAH025_M.A200412.021.nc4"/>
+    </aggregation>
+</netcdf>
