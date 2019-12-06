@@ -1,12 +1,9 @@
 #!/bin/bash
 
-echo "date --date="yesterday" +%Y/%m/%d"
-
 date=$(date -d '1 day ago' +'%Y%m%d.0')
 host_forecasts_dir=/home/tethys/spt_files/ecmwf
 api_forecasts_dir=/mnt/output/ecmwf
 container_name=gsprestapi_gsp_api_1
-
 
 for region in $(ls $host_forecasts_dir)
 do
