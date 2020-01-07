@@ -43,15 +43,13 @@ def aggregate_by_day(path_Qout):
     new_nc = netCDF4.Dataset(filename=newfilepath, mode='w')
 
     # create rivid and time dimensions
-    logging.info('creating dimensions')
+    logging.info('creating new netcdf variables/dimensions')
     new_nc.createDimension('rivid', size=source_nc.dimensions['rivid'].size)
     new_nc.createDimension('time', size=source_nc.dimensions['time'].size // 24)
     # create rivid and time variables
-    logging.info('creating rivid and time variables')
     new_nc.createVariable('rivid', datatype='f4', dimensions=('rivid',), )
     new_nc.createVariable('time', datatype='f4', dimensions=('time',), )
     # create the variables for the flows
-    logging.info('creating Q variables')
     new_nc.createVariable('Qout_min', datatype='f4', dimensions=('time', 'rivid'))
     new_nc.createVariable('Qout_mean', datatype='f4', dimensions=('time', 'rivid'))
     new_nc.createVariable('Qout_max', datatype='f4', dimensions=('time', 'rivid'))
@@ -70,8 +68,7 @@ def aggregate_by_day(path_Qout):
     # for each river read the whole time series
     num_rivers = source_nc.dimensions['rivid'].size
     for i in range(num_rivers):
-        start = time.time()
-        logging.info('working on rivid ' + str(i) + ' of ' + str(num_rivers))
+        logging.info(str(i) + '/' + str(num_rivers) + '. Started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
         tmp = source_nc.variables['Qout'][:, i]
         min_arrs = []
         mean_arrs = []
@@ -88,21 +85,19 @@ def aggregate_by_day(path_Qout):
             tmp = tmp[agg_hours:]
         # if it didn't divide perfectly into 24 hour segments, say something
         if len(tmp) > 0:
-            print('Did not divide evenly')
-            print(len(tmp))
-            print(tmp)
+            logging.info('Did not divide evenly')
+            logging.info(len(tmp))
+            logging.info(tmp)
         # write the new arrays to the new variables
         new_nc.variables['Qout_min'][:, i] = min_arrs
         new_nc.variables['Qout_mean'][:, i] = mean_arrs
         new_nc.variables['Qout_max'][:, i] = max_arrs
-        logging.info('      Process took ' + str(round(time.time() - start, 2)))
     return
 
 
 # for running this script from the command line with a script
 if __name__ == '__main__':
     # enable logging to track the progress of the workflow and for debugging
-
     logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.INFO, format='%(message)s')
     logging.info('ERA5 aggregation started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
     aggregate_by_day(sys.argv[1])
