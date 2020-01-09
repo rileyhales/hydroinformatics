@@ -82,11 +82,6 @@ def aggregate_by_day(path_Qout):
             max_arrs.append(max(piece))
             # drop the first 24 steps
             tmp = tmp[agg_hours:]
-        # if it didn't divide perfectly into 24 hour segments, say something
-        if len(tmp) > 0:
-            logging.info('Did not divide evenly')
-            # logging.info(len(tmp))
-            # logging.info(tmp)
         # write the new arrays to the new variables
         logging.info('   writing qmin')
         new_nc.variables['Qout_min'][:, i] = min_arrs
@@ -98,5 +93,6 @@ def aggregate_by_day(path_Qout):
 
 
 # for running this script from the command line with a script
+logging.basicConfig(filename='africa5.log', filemode='w', level=logging.INFO, format='%(message)s')
 logging.info('ERA5 aggregation started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
-aggregate_by_day('sampledata/africa-geoglows/Qout_era5_t640_1hr_19790101to20181231.nc')
+aggregate_by_day('/home/civil/era5/Qout_era5_t640_1hr_19790101to20181231.nc')
