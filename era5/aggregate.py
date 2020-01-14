@@ -66,7 +66,7 @@ def aggregate_by_day(path_Qout):
     # for each river read the whole time series
     num_rivers = source_nc.dimensions['rivid'].size
     for i in range(num_rivers):
-        logging.info(str(i) + '/' + str(num_rivers) + '. Started ' + datetime.datetime.utcnow().strftime("%D at %R"))
+        logging.info(str(i) + '/' + str(num_rivers) + ': Started ' + datetime.datetime.utcnow().strftime("%D at %R"))
         min_arr, mean_arr, max_arr = subset_list(source_nc.variables['Qout'][:, i], agg_hours)
         # write the new arrays to the new variables
         logging.info('  writing Qmin variables')
@@ -76,6 +76,8 @@ def aggregate_by_day(path_Qout):
         logging.info('  writing Qmax variables')
         new_nc.variables['Qout_max'][:, i] = max_arr
         new_nc.sync()
+    new_nc.close()
+    source_nc.close()
 
     logging.info('')
     logging.info('FINISHED')
@@ -85,10 +87,11 @@ def aggregate_by_day(path_Qout):
 
 # for running this script from the command line with a script
 if __name__ == '__main__':
-    # sys.argv[0] this script e.g. aggregate.py
-    # sys.argv[1] path to Qout file
-    # sys.argv[2] path to log file
-
+    """
+    sys.argv[0] this script e.g. aggregate.py
+    sys.argv[1] path to Qout file
+    sys.argv[2] path to log file
+    """
     # enable logging to track the progress of the workflow and for debugging
     logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.INFO, format='%(message)s')
     logging.info('ERA5 aggregation started on ' + datetime.datetime.utcnow().strftime("%D at %R"))

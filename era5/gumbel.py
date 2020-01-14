@@ -5,6 +5,7 @@ import logging
 import statistics
 import math
 import datetime
+import pandas
 
 
 def solve_gumbel_flow(std, xbar, rp):
@@ -19,6 +20,10 @@ def solve_gumbel_flow(std, xbar, rp):
 
 def daily_to_yearly_max_flow(daily_flow_list):
     yearly_max_flows = []
+    dates = pandas.Series(pandas.date_range('1979-1-1 00:00:00', periods=len(daily_flow_list), freq='D'))
+    df = pandas.DataFrame(daily_flow_list, columns=['simulated_flow'], index=dates)
+    for i in range(1979, 2019):
+        yearly_max_flows.append(max(df[df.index.year == i]['simulated_flow']))
     return yearly_max_flows
 
 
@@ -52,8 +57,8 @@ def gumbel_return_periods(path_Qout):
     # for each river read the whole time series
     num_rivers = source_nc.dimensions['rivid'].size
     for i in range(num_rivers):
-        logging.info(str(i) + '/' + str(num_rivers) + '. Started ' + datetime.datetime.utcnow().strftime("%D at %R"))
-        yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables['Qout'][:, i])
+        logging.info(str(i) + '/' + str(num_rivers) + ': Started ' + datetime.datetime.utcnow().strftime("%D at %R"))
+        yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables['Qout_max'][:, i])
         xbar = statistics.mean(yearly_max_flows)
         std = statistics.stdev(yearly_max_flows, xbar=xbar)
         rp_nc.variables['r100'][i] = solve_gumbel_flow(std, xbar, 100)
@@ -64,6 +69,8 @@ def gumbel_return_periods(path_Qout):
         rp_nc.variables['r2'][i] = solve_gumbel_flow(std, xbar, 2)
         rp_nc.sync()
 
+    rp_nc.close()
+    source_nc.close()
     logging.info('')
     logging.info('FINISHED')
     logging.info(datetime.datetime.utcnow().strftime("%D at %R"))
@@ -72,10 +79,11 @@ def gumbel_return_periods(path_Qout):
 
 # for running this script from the command line with a script
 if __name__ == '__main__':
-    # sys.argv[0] this script e.g. gumbel.py
-    # sys.argv[1] path to Qout file
-    # sys.argv[2] path to log file
-
+    """
+    sys.argv[0] this script e.g. gumbel.py
+    sys.argv[1] path to Qout file
+    sys.argv[2] path to log file
+    """
     # enable logging to track the progress of the workflow and for debugging
     logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.INFO, format='%(message)s')
     logging.info('Gumbel Return Period Processing started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
