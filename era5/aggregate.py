@@ -67,7 +67,7 @@ def aggregate_by_day(path_Qout):
     num_rivers = source_nc.dimensions['rivid'].size
     for i in range(num_rivers):
         logging.info(str(i) + '/' + str(num_rivers) + ': Started ' + datetime.datetime.utcnow().strftime("%D at %R"))
-        min_arr, mean_arr, max_arr = subset_list(source_nc.variables['Qout'][:, i], agg_hours)
+        min_arr, mean_arr, max_arr = subset_list(list(source_nc.variables['Qout'][i, :]), agg_hours)
         # write the new arrays to the new variables
         logging.info('  writing Qmin variables')
         new_nc.variables['Qout_min'][:, i] = min_arr
