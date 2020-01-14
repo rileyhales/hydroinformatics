@@ -85,10 +85,16 @@ def aggregate_by_day(path_Qout):
         # write the new arrays to the new variables
         logging.info('   writing qmin')
         new_nc.variables['Qout_min'][:, i] = min_arrs
+        new_nc.sync()
         logging.info('   writing qmean')
         new_nc.variables['Qout_mean'][:, i] = mean_arrs
+        new_nc.sync()
         logging.info('   writing qmax')
         new_nc.variables['Qout_max'][:, i] = max_arrs
+        new_nc.sync()
+
+    source_nc.close()
+    new_nc.close()
     return
 
 

@@ -78,10 +78,6 @@ def aggregate_by_day(path_Qout):
         new_nc.sync()
     new_nc.close()
     source_nc.close()
-
-    logging.info('')
-    logging.info('FINISHED')
-    logging.info(datetime.datetime.utcnow().strftime("%D at %R"))
     return newfilepath
 
 
@@ -96,3 +92,6 @@ if __name__ == '__main__':
     logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.INFO, format='%(message)s')
     logging.info('ERA5 aggregation started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
     aggregate_by_day(sys.argv[1])
+    logging.info('')
+    logging.info('FINISHED')
+    logging.info(datetime.datetime.utcnow().strftime("%D at %R"))
