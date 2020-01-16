@@ -10,7 +10,7 @@ def aggregate_by_day(path_Qout):
     # sort out the file paths
     if not os.path.isfile(path_Qout):
         raise FileNotFoundError('Qout file not found at this path')
-    newfilepath = os.path.join(os.path.dirname(path_Qout), 'Aggregated_Qout.nc4')
+    newfilepath = os.path.join(os.path.dirname(path_Qout), 'DailyAggregated_' + os.path.basename(path_Qout) + '4')
 
     # read the netcdfs
     source_nc = netCDF4.Dataset(filename=path_Qout, mode='r')
@@ -78,6 +78,10 @@ def aggregate_by_day(path_Qout):
         new_nc.sync()
     new_nc.close()
     source_nc.close()
+
+    logging.info('')
+    logging.info('FINISHED')
+    logging.info(datetime.datetime.utcnow().strftime("%D at %R"))
     return newfilepath
 
 
@@ -94,6 +98,3 @@ if __name__ == '__main__':
     logging.info('ERA5 aggregation started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
     aggregate_by_day(sys.argv[1])
     # aggregate_by_day('/Users/rileyhales/Downloads/era5samplefiles/nam_clearwater/Qout_era5_t640_1hr_19790101to20181231.nc')
-    logging.info('')
-    logging.info('FINISHED')
-    logging.info(datetime.datetime.utcnow().strftime("%D at %R"))

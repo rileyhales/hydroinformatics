@@ -31,7 +31,7 @@ def gumbel_return_periods(path_Qout):
     # sort out the file paths
     if not os.path.isfile(path_Qout):
         raise FileNotFoundError('Qout file not found at this path')
-    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'return_periods.nc4')
+    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'Gumbel_return_periods.nc4')
 
     # read the netcdfs
     source_nc = netCDF4.Dataset(filename=path_Qout, mode='r')
