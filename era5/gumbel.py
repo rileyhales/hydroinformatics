@@ -18,16 +18,27 @@ def solve_gumbel_flow(std, xbar, rp):
     return -math.log(-math.log(1 - (1 / rp))) * std * .7797 + xbar - (.45 * std)
 
 
-def daily_to_yearly_max_flow(daily_flow_list):
+def daily_to_yearly_max_flow(daily_flow_list, start_yr, end_yr):
     yearly_max_flows = []
-    dates = pandas.Series(pandas.date_range('1979-1-1 00:00:00', periods=len(daily_flow_list), freq='D'))
+    dates = pandas.Series(pandas.date_range(str(start_yr) + '-1-1 00:00:00', periods=len(daily_flow_list), freq='D'))
     df = pandas.DataFrame(daily_flow_list, columns=['simulated_flow'], index=dates)
-    for i in range(1979, 2019):
+    for i in range(start_yr, end_yr + 1):
         yearly_max_flows.append(max(df[df.index.year == i]['simulated_flow']))
     return yearly_max_flows
 
 
-def gumbel_return_periods(path_Qout):
+def gumbel_return_periods(path_Qout, forcing):
+    if forcing == 'interim':
+        start_yr = 1980
+        end_yr = 2015
+        flow_var = 'Qout'
+    elif forcing == 'era5':
+        start_yr = 1979
+        end_yr = 2018
+        flow_var = 'Qout_max'
+    else:
+        raise ValueError('choose interim or era5')
+
     # sort out the file paths
     if not os.path.isfile(path_Qout):
         raise FileNotFoundError('Qout file not found at this path')
@@ -58,9 +69,11 @@ def gumbel_return_periods(path_Qout):
     num_rivers = source_nc.dimensions['rivid'].size
     for i in range(num_rivers):
         logging.info(str(i) + '/' + str(num_rivers) + ': Started ' + datetime.datetime.utcnow().strftime("%D at %R"))
-        yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables['Qout_max'][:, i])
+        yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables[flow_var][:, i], start_yr, end_yr)
         xbar = statistics.mean(yearly_max_flows)
         std = statistics.stdev(yearly_max_flows, xbar=xbar)
+        logging.info('xbar: ' + str(xbar))
+        logging.info('std: ' + str(std))
         rp_nc.variables['r100'][i] = solve_gumbel_flow(std, xbar, 100)
         rp_nc.variables['r50'][i] = solve_gumbel_flow(std, xbar, 50)
         rp_nc.variables['r25'][i] = solve_gumbel_flow(std, xbar, 25)
@@ -82,9 +95,10 @@ if __name__ == '__main__':
     """
     sys.argv[0] this script e.g. gumbel.py
     sys.argv[1] path to Qout file
-    sys.argv[2] path to log file
+    sys.argv[2] interim or era5
+    sys.argv[3] path to log file
     """
     # enable logging to track the progress of the workflow and for debugging
-    logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.INFO, format='%(message)s')
+    logging.basicConfig(filename=sys.argv[3], filemode='w', level=logging.INFO, format='%(message)s')
     logging.info('Gumbel Return Period Processing started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
-    gumbel_return_periods(sys.argv[1])
+    gumbel_return_periods(sys.argv[1], sys.argv[2])
