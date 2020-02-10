@@ -72,8 +72,12 @@ def gumbel_return_periods(path_Qout):
     num_rivers = source_nc.dimensions['rivid'].size
     for i in range(num_rivers):
         logging.info(str(i) + '/' + str(num_rivers))
-        # order of slice is i, : / if it fails, it came from an old version of rapid and order is :, i
-        yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables[flow_var][i, :], start_yr, end_yr)
+
+        # order of slice is i, :
+        # yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables[flow_var][i, :], start_yr, end_yr)
+        # if it fails, it came from an old version of rapid and order is :, i
+        yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables[flow_var][:, i], start_yr, end_yr)
+
         xbar = statistics.mean(yearly_max_flows)
         std = statistics.stdev(yearly_max_flows, xbar=xbar)
         logging.info('xbar: ' + str(xbar))
@@ -109,20 +113,20 @@ def gumbel_return_periods(path_Qout):
 
 # logging.basicConfig(filename='/Users/rileyhales/Downloads/INTERIM/log.log', filemode='w', level=logging.INFO, format='%(message)s')
 # intfiles = (
-#     '/Users/rileyhales/Downloads/INTERIM/africa-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/australia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/central_america-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/central_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/east_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/europe-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/japan-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/middle_east-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/north_america-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/south_america-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/south_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-#     '/Users/rileyhales/Downloads/INTERIM/west_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/africa-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/australia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/central_america-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/central_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/east_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/europe-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/japan-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/middle_east-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/north_america-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/south_america-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/south_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
+    # '/Users/rileyhales/Downloads/INTERIM/west_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
 # )
-#
+
 # for intfile in intfiles:
 #     print(os.path.basename(os.path.dirname(intfile)))
 #     logging.info('Gumbel Return Period Processing started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
