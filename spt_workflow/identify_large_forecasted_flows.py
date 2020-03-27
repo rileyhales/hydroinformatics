@@ -22,7 +22,7 @@ import numpy as np
 
 def get_time_of_first_exceedence(flow, means, times):
     # replace the flows that are too small (don't exceed the return period)
-    means[means < flow] = np.nan
+    means[means < flow] = 0
     # convert to list
     means = list(means)
     # return the time at the same index as the first non np.nan flow (uses i>0 because of how nan works in logic)
@@ -64,6 +64,8 @@ def make_forecasted_flow_summary(comids, qout_folder, rp_file):
     for comid in comids:
         # produce a 1D array containing the timeseries average flow from all ensembles on each forecast timestep
         means = np.array(merged_ds.sel(rivid=comid)).mean(axis=0)
+        means = np.nan_to_num(means)
+        means[means == np.nan] = -1
         max_flow = max(means)
 
         # determine the index of comid in the return periods array
@@ -105,7 +107,7 @@ def make_forecasted_flow_summary(comids, qout_folder, rp_file):
             # 'date_r100': date_r100,
         }, ignore_index=True)
 
-    largeflows.to_csv(os.path.join(qout_folder, 'forecasted_return_periods_summary.csv'))
+    largeflows.to_csv(os.path.join(qout_folder, 'forecasted_return_periods_summary.csv'), index=False)
 
     return
 
@@ -123,8 +125,8 @@ if __name__ == '__main__':
 
     # begin the logging
     start = datetime.datetime.now()
-    log = os.path.join(large_stream_directory, 'logs', start.strftime("%Y%m%d-%H") + '_identify_large_forecasted_flows')
-    logging.basicConfig(log, level=logging.INFO)
+    log = os.path.join(large_stream_directory, 'logs', start.strftime("%Y%m%d") + '-identify_large_forecasted_flows')
+    logging.basicConfig(filename=log, filemode='w', level=logging.INFO)
     logging.info('identify_large_forecasted_flows.py initiated ' + start.strftime("%c"))
 
     # figure out which stream lists are in the directory
@@ -138,8 +140,9 @@ if __name__ == '__main__':
         for stream_list in stream_lists:
             # extract the region name, log messages
             region_name = os.path.basename(stream_list).replace('large_str-', '').replace('.csv', '')
-            logging.info('\nidentified large stream list for region: ' + region_name)
+            logging.info('')
             logging.info('Elapsed time: ' + str(datetime.datetime.now() - start))
+            logging.info('identified large stream list for region: ' + region_name)
 
             # get a list of comids from the csv files
             comids = pd.read_csv(stream_list, header=None)[0].to_list()
@@ -149,7 +152,9 @@ if __name__ == '__main__':
             if len(recent_date) == 0:
                 logging.info('no date directories found. skipping.')
                 pass
-            qout_folder = os.path.join(forecasts_directory, region_name, recent_date[-1])
+            recent_date = recent_date[-1]
+            logging.info('identified the most recent forecast date is ' + recent_date)
+            qout_folder = os.path.join(forecasts_directory, region_name, recent_date)
             if not os.path.exists(qout_folder):
                 logging.info('qout folder not found. skipping region.')
                 pass
@@ -168,4 +173,7 @@ if __name__ == '__main__':
         logging.info('Exception occured at ' + datetime.datetime.now().strftime("%c"))
         logging.info(e)
 
-    logging.info('\nidentify_large_forecasted_flows.py finished at ' + datetime.datetime.now().strftime('%c'))
+    end = datetime.datetime.now()
+    logging.info('')
+    logging.info('identify_large_forecasted_flows.py finished at ' + end.strftime('%c'))
+    logging.info('total time elapsed: ' + str(end - start))
