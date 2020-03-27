@@ -29,7 +29,7 @@ def get_time_of_first_exceedence(flow, means, times):
     return times[means.index(next(i for i in means if i > 0))]
 
 
-def make_forecasted_flow_summary(comids, qout_folder, rp_file):
+def make_forecasted_flow_summary(comids_orders, qout_folder, rp_file):
     # get list of prediction files
     prediction_files = sorted(glob.glob(os.path.join(qout_folder, 'Qout*.nc')))
 
@@ -58,10 +58,10 @@ def make_forecasted_flow_summary(comids, qout_folder, rp_file):
     return_period_nc.close()
 
     # make the pandas dataframe to store the summary info
-    largeflows = pd.DataFrame(columns=['comid', 'stream_lat', 'stream_lon', 'max_flow', 'date_r2'])  # , 'date_r10', 'date_r20', 'date_r25', 'date_r50', 'date_r100'])
+    largeflows = pd.DataFrame(columns=['comid', 'stream_order', 'stream_lat', 'stream_lon', 'max_flow', 'date_r2'])  # , 'date_r10', 'date_r20', 'date_r25', 'date_r50', 'date_r100'])
 
     # for each comid in the forecast
-    for comid in comids:
+    for comid, stream_order in comids_orders:
         # produce a 1D array containing the timeseries average flow from all ensembles on each forecast timestep
         means = np.array(merged_ds.sel(rivid=comid)).mean(axis=0)
         means = np.nan_to_num(means)
@@ -96,6 +96,7 @@ def make_forecasted_flow_summary(comids, qout_folder, rp_file):
             continue
         largeflows = largeflows.append({
             'comid': int(comid),
+            'stream_order': int(stream_order),
             'stream_lat': lat[index_rp],
             'stream_lon': lon[index_rp],
             'max_flow': max_flow,
@@ -125,7 +126,11 @@ if __name__ == '__main__':
 
     # begin the logging
     start = datetime.datetime.now()
-    log = os.path.join(large_stream_directory, 'logs', start.strftime("%Y%m%d") + '-identify_large_forecasted_flows')
+    logs_dir = os.path.join(large_stream_directory, 'logs')
+    # if there isn't a logging directory, make it
+    if not os.path.exists(logs_dir):
+        os.mkdir(logs_dir)
+    log = os.path.join(logs_dir, start.strftime("%Y%m%d") + '-identify_large_forecasted_flows')
     logging.basicConfig(filename=log, filemode='w', level=logging.INFO)
     logging.info('identify_large_forecasted_flows.py initiated ' + start.strftime("%c"))
 
@@ -136,8 +141,8 @@ if __name__ == '__main__':
         logging.info('No lists of streams identified. Exiting.')
         exit()
 
-    try:
-        for stream_list in stream_lists:
+    for stream_list in stream_lists:
+        try:
             # extract the region name, log messages
             region_name = os.path.basename(stream_list).replace('large_str-', '').replace('.csv', '')
             logging.info('')
@@ -145,34 +150,43 @@ if __name__ == '__main__':
             logging.info('identified large stream list for region: ' + region_name)
 
             # get a list of comids from the csv files
-            comids = pd.read_csv(stream_list, header=None)[0].to_list()
+            df = pd.read_csv(stream_list)
+            comids_orders = zip(df['COMID'].to_list(), df['order_'].to_list())
 
             # build the paths to the qout folder
-            recent_date = sorted(os.listdir(os.path.join(forecasts_directory, region_name)))
-            if len(recent_date) == 0:
-                logging.info('no date directories found. skipping.')
-                pass
-            recent_date = recent_date[-1]
-            logging.info('identified the most recent forecast date is ' + recent_date)
-            qout_folder = os.path.join(forecasts_directory, region_name, recent_date)
+            qout_folder = os.path.join(forecasts_directory, region_name)
+            # if it doesn't exist, log it, skip it
             if not os.path.exists(qout_folder):
                 logging.info('qout folder not found. skipping region.')
-                pass
+                continue
+            # if it exists, check what dates are in it
+            recent_date = sorted(os.listdir(os.path.join(forecasts_directory, region_name)))
+            # if it can't find a date, log it, skip it
+            if len(recent_date) == 0:
+                logging.info('no date directories found. skipping.')
+                continue
+            # pick the most recent date, append to the file path
+            recent_date = recent_date[-1]
+            qout_folder = os.path.join(qout_folder, recent_date)
+            logging.info('identified the most recent forecast date is ' + recent_date)
 
             # build the path to the historical data and return period file
             historical_path = os.path.join(historical_directory, region_name)
+            # if it doesn't exist, log it, skip it
             if not os.path.exists(historical_path):
                 logging.info('historical folder for this region not found. skipping region.')
-                pass
+                continue
             return_period_file = glob.glob(os.path.join(historical_path, 'return_period*.nc'))[0]
 
-            # since all files exist, run the summarization function
-            make_forecasted_flow_summary(comids, qout_folder, return_period_file)
+            # got all the information we need. run the summarization function
+            make_forecasted_flow_summary(comids_orders, qout_folder, return_period_file)
 
-    except Exception as e:
-        logging.info('Exception occured at ' + datetime.datetime.now().strftime("%c"))
-        logging.info(e)
+        # if you get any other error, the problem was with the system or the file's data. log it to be debugged
+        except Exception as e:
+            logging.info('Exception occurred at ' + datetime.datetime.now().strftime("%c"))
+            logging.info(e)
 
+    # log when you finish
     end = datetime.datetime.now()
     logging.info('')
     logging.info('identify_large_forecasted_flows.py finished at ' + end.strftime('%c'))
