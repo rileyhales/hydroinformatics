@@ -6,7 +6,7 @@ Copyright March 2020
 License: BSD 3 Clause
 
 Identifies flows forecasted to experience a return period level flow on streams from a preprocessed list of stream
-COMID's in each region.s
+COMID's in each region
 """
 
 import os
@@ -127,19 +127,43 @@ if __name__ == '__main__':
     logging.basicConfig(log, level=logging.INFO)
     logging.info('identify_large_forecasted_flows.py initiated ' + start.strftime("%c"))
 
+    # figure out which stream lists are in the directory
+    stream_lists = glob.glob(os.path.join(large_stream_directory, 'large_str-*.csv'))
+
+    if len(stream_lists) == 0:
+        logging.info('No lists of streams identified. Exiting.')
+        exit()
+
     try:
-        stream_lists = glob.glob(os.path.join(large_stream_directory, 'large_str-*.csv'))
         for stream_list in stream_lists:
-            comids = pd.read_csv(stream_list, header=None)[0].to_list()
+            # extract the region name, log messages
             region_name = os.path.basename(stream_list).replace('large_str-', '').replace('.csv', '')
-            logging.info('\nidentified large flow list for region: ' + region_name)
+            logging.info('\nidentified large stream list for region: ' + region_name)
             logging.info('Elapsed time: ' + str(datetime.datetime.now() - start))
 
-            recent_date = sorted(os.listdir(os.path.join(forecasts_directory, region_name)))[-1]
-            qout_folder = os.path.join(forecasts_directory, region_name, recent_date)
-            return_period_file = glob.glob(os.path.join(historical_directory, region_name, 'return_period*.nc'))[0]
+            # get a list of comids from the csv files
+            comids = pd.read_csv(stream_list, header=None)[0].to_list()
 
+            # build the paths to the qout folder
+            recent_date = sorted(os.listdir(os.path.join(forecasts_directory, region_name)))
+            if len(recent_date) == 0:
+                logging.info('no date directories found. skipping.')
+                pass
+            qout_folder = os.path.join(forecasts_directory, region_name, recent_date[-1])
+            if not os.path.exists(qout_folder):
+                logging.info('qout folder not found. skipping region.')
+                pass
+
+            # build the path to the historical data and return period file
+            historical_path = os.path.join(historical_directory, region_name)
+            if not os.path.exists(historical_path):
+                logging.info('historical folder for this region not found. skipping region.')
+                pass
+            return_period_file = glob.glob(os.path.join(historical_path, 'return_period*.nc'))[0]
+
+            # since all files exist, run the summarization function
             make_forecasted_flow_summary(comids, qout_folder, return_period_file)
+
     except Exception as e:
         logging.info('Exception occured at ' + datetime.datetime.now().strftime("%c"))
         logging.info(e)
