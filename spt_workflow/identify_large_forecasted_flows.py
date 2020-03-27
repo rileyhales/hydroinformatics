@@ -1,71 +1,23 @@
+"""
+identify_large_forecasted_flows.py
+
+Author: Riley Hales
+Copyright March 2020
+License: BSD 3 Clause
+
+Identifies flows forecasted to experience a return period level flow on streams from a preprocessed list of stream
+COMID's in each region.s
+"""
+
 import os
+import logging
+import datetime
+import sys
 import glob
 import netCDF4 as nc
 import xarray
 import pandas as pd
 import numpy as np
-
-
-def make_one_ensemble_summary(qout_file, rp_file, csv_save_dir):
-    """
-    Creates a csv file with the columns:
-        comid, stream_lat, stream_lon, return_period_exceeded, flow
-    For example:
-        10000, 40, -30, 25, 150
-    indicates that comid 10000, located at lat 40 and lon -30, surpassed it's 25 year return period flow with a flow of
-    150 cubic meters per second.
-
-    Args:
-        qout_file: the full path to a Qout file produced by the ECMWF rapid workflow
-        rp_file: the full path to the Gumbel return periods file for the same region
-        csv_save_dir: the directory where to save the csv
-    """
-    # get the comids in qout file
-    qout_data = nc.Dataset(qout_file, 'r')
-    comids_qout = qout_data['rivid'][:]
-
-    return_period_nc = nc.Dataset(rp_file, 'r')
-    comids_rp = list(return_period_nc.variables['rivid'][:])
-    # r100_thresholds = return_period_nc.variables['return_period_100'][:]
-    # r50_thresholds = return_period_nc.variables['return_period_50'][:]
-    # r25_thresholds = return_period_nc.variables['return_period_25'][:]
-    r20_thresholds = return_period_nc.variables['return_period_20'][:]
-    r10_thresholds = return_period_nc.variables['return_period_10'][:]
-    r2_thresholds = return_period_nc.variables['return_period_2'][:]
-    lat = return_period_nc.variables['lat'][:]
-    lon = return_period_nc.variables['lon'][:]
-    return_period_nc.close()
-
-    largeflows = pd.DataFrame(columns=['comid', 'stream_lat', 'stream_lon', 'return_period', 'flow'])
-
-    for index_qout, comid in enumerate(comids_qout):
-        index_rp = comids_rp.index(comid)
-        maxflow = max(qout_data['Qout'][index_rp])
-
-        # if maxflow >= r100_thresholds[index_rp]:
-        #     rp = 100
-        # elif maxflow >= r50_thresholds[index_rp]:
-        #     rp = 50
-        # elif maxflow >= r25_thresholds[index_rp]:
-        #     rp = 25
-        if maxflow >= r20_thresholds[index_rp]:
-            rp = 20
-        elif maxflow >= r10_thresholds[index_rp]:
-            rp = 10
-        elif maxflow >= r2_thresholds[index_rp]:
-            rp = 2
-        else:
-            continue
-        largeflows = largeflows.append({
-            'comid': int(comid),
-            'stream_lat': lat[index_rp],
-            'stream_lon': lon[index_rp],
-            'return_period': rp,
-            'flow': maxflow,
-        }, ignore_index=True)
-
-    largeflows.to_csv(os.path.join(csv_save_dir, 'forecasted_return_periods_summary.csv'))
-    return
 
 
 def get_time_of_first_exceedence(flow, means, times):
@@ -77,7 +29,7 @@ def get_time_of_first_exceedence(flow, means, times):
     return times[means.index(next(i for i in means if i > 0))]
 
 
-def make_forecasted_flow_summary(qout_folder, rp_file):
+def make_forecasted_flow_summary(comids, qout_folder, rp_file):
     # get list of prediction files
     prediction_files = sorted(glob.glob(os.path.join(qout_folder, 'Qout*.nc')))
 
@@ -89,9 +41,8 @@ def make_forecasted_flow_summary(qout_folder, rp_file):
         qout_datasets.append(xarray.open_dataset(forecast_nc).Qout)
     merged_ds = xarray.concat(qout_datasets, pd.Index(ensemble_index_list, name='ensemble'))
 
-    # collect the times and comids from the forecasts
+    # collect the times from the forecasts
     times = list(merged_ds.time)
-    comids_qout = list(merged_ds.rivid)
 
     # read the return period file
     return_period_nc = nc.Dataset(rp_file, 'r')
@@ -110,7 +61,7 @@ def make_forecasted_flow_summary(qout_folder, rp_file):
     largeflows = pd.DataFrame(columns=['comid', 'stream_lat', 'stream_lon', 'max_flow', 'date_r2'])  # , 'date_r10', 'date_r20', 'date_r25', 'date_r50', 'date_r100'])
 
     # for each comid in the forecast
-    for index_qout, comid in enumerate(comids_qout):
+    for comid in comids:
         # produce a 1D array containing the timeseries average flow from all ensembles on each forecast timestep
         means = np.array(merged_ds.sel(rivid=comid)).mean(axis=0)
         max_flow = max(means)
@@ -159,4 +110,38 @@ def make_forecasted_flow_summary(qout_folder, rp_file):
     return
 
 
-make_forecasted_flow_summary('/Users/rileyhales/SpatialData/SPT/20200323.0', '/Users/rileyhales/SpatialData/SPT/return_periods_erai_t511_24hr_19800101to20141231.nc')
+if __name__ == '__main__':
+    # arg1 = path to the directory with the large stream lists
+    # arg2 = path to directory where forecasts get stored, the folder that contains 1 folder for each region
+    # arg3 = path to directory where historical data are stored, the folder that contains 1 folder for each region
+
+    # accept the arguments
+    args = sys.argv
+    large_stream_directory = args[1]
+    forecasts_directory = args[2]
+    historical_directory = args[3]
+
+    # begin the logging
+    start = datetime.datetime.now()
+    log = os.path.join(large_stream_directory, 'logs', start.strftime("%Y%m%d-%H") + '_identify_large_forecasted_flows')
+    logging.basicConfig(log, level=logging.INFO)
+    logging.info('identify_large_forecasted_flows.py initiated ' + start.strftime("%c"))
+
+    try:
+        stream_lists = glob.glob(os.path.join(large_stream_directory, 'large_str-*.csv'))
+        for stream_list in stream_lists:
+            comids = pd.read_csv(stream_list, header=None)[0].to_list()
+            region_name = os.path.basename(stream_list).replace('large_str-', '').replace('.csv', '')
+            logging.info('\nidentified large flow list for region: ' + region_name)
+            logging.info('Elapsed time: ' + str(datetime.datetime.now() - start))
+
+            recent_date = sorted(os.listdir(os.path.join(forecasts_directory, region_name)))[-1]
+            qout_folder = os.path.join(forecasts_directory, region_name, recent_date)
+            return_period_file = glob.glob(os.path.join(historical_directory, region_name, 'return_period*.nc'))[0]
+
+            make_forecasted_flow_summary(comids, qout_folder, return_period_file)
+    except Exception as e:
+        logging.info('Exception occured at ' + datetime.datetime.now().strftime("%c"))
+        logging.info(e)
+
+    logging.info('\nidentify_large_forecasted_flows.py finished at ' + datetime.datetime.now().strftime('%c'))
