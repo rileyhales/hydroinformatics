@@ -125,12 +125,11 @@ def postprocess_region(region, rapidio, historical_sim, forecast_records):
     large_streams_df = pd.read_csv(stream_list)
     large_list = large_streams_df['COMID'].to_list()
 
-    # identify the netcdf used to store the forecast record
-    forecast_record_file = find_forecast_record_netcdf(region, forecast_records, qout_folder, year)
-    record_times = list(forecast_record_file.variables['time'][:])
-
     # message for tracking the workflow
     logging.info('beginning to iterate over the comids')
+
+    # store the first day flows in a huge array
+    first_day_flows = []
 
     # now process the mean flows for each river in the region
     for comid in comids:
@@ -138,15 +137,8 @@ def postprocess_region(region, rapidio, historical_sim, forecast_records):
         means = np.array(merged_forecasts.sel(rivid=comid)).mean(axis=0)
         # put it in a dataframe with the times series
         forecasted_flows = times.to_frame(name='times').join(pd.Series(means, name='means')).dropna()
-
         # select flows in 1st day and save them to the forecast record
-        first_day_flows = forecasted_flows[forecasted_flows.times < tomorrow]
-        comid_index = list(forecast_record_file.variables['rivid'][:]).index(comid)
-        day_times = first_day_flows['times']
-        day_flows = first_day_flows['means']
-        for time, flow in zip(day_times, day_flows):
-            idx = record_times.index(datetime.datetime.timestamp(time))
-            forecast_record_file.variables['Qout'][comid_index, idx] = flow
+        first_day_flows.append(list(forecasted_flows[forecasted_flows.times < tomorrow]['means']))
 
         # if stream order is larger than 2, check if it needs to be included on the return periods summary csv
         if comid in large_list:
@@ -154,7 +146,17 @@ def postprocess_region(region, rapidio, historical_sim, forecast_records):
             rp_data = return_period_data[return_period_data.index == comid]
             largeflows = check_for_return_period_flow(largeflows, forecasted_flows, order, rp_data)
 
-    # close the forecast_record_file
+    # identify the netcdf used to store the forecast record
+    forecast_record_file = find_forecast_record_netcdf(region, forecast_records, qout_folder, year)
+    record_times = list(forecast_record_file.variables['time'][:])
+    start_time_index = record_times.index(datetime.datetime.timestamp(times[0]))
+    end_time_index = start_time_index + len(first_day_flows[0])
+
+    # convert all those saved flows to a np array and write to the netcdf
+    first_day_flows = np.asarray(first_day_flows)
+    forecast_record_file.variables['Qout'][:, start_time_index:end_time_index] = first_day_flows
+
+    # save and close the netcdf
     forecast_record_file.sync()
     forecast_record_file.close()
 
@@ -214,11 +216,6 @@ if __name__ == '__main__':
     historical_sim = sys.argv[2]
     forecast_records = sys.argv[3]
     logs_dir = sys.argv[4]
-
-    # rapidio = '/Users/rileyhales/SpatialData/SPT/rapid-io/'
-    # historical_sim = '/Users/rileyhales/SpatialData/SPT/historical/'
-    # forecast_records = '/Users/rileyhales/SpatialData/SPT/forecastrecords/'
-    # logs_dir = '/Users/rileyhales/SpatialData/SPT/logs/'
 
     # list of regions to be processed based on their forecasts
     regions = os.listdir(os.path.join(rapidio, 'input'))
