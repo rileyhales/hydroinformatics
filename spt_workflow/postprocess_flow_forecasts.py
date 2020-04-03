@@ -19,10 +19,14 @@ import pandas as pd
 import xarray
 import netCDF4 as nc
 
+# todo make process_region into process_date which gets called by process_region, then you can pick whether to aggregate all days or none
+
 
 def merge_forecast_qout_files(rapidio_region_output):
     # pick the most recent date, append to the file path
     recent_date = sorted(os.listdir(rapidio_region_output))
+    while recent_date[-1].endswith('.csv'):
+        recent_date.remove(recent_date[-1])
     recent_date = recent_date[-1]
     qout_folder = os.path.join(rapidio_region_output, recent_date)
     # list the forecast files
