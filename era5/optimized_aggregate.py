@@ -46,7 +46,7 @@ def aggregate_by_day(path_Qout, write_frequency=500):
     number_hours = source_nc.variables['time'].shape[0] - 1
     number_days = number_hours / 24
     hours_in_day = 24
-    print(num_rivers)
+    logging.info('number of rivers: ' + str(num_rivers))
 
     # create a set of indices for slicing the array in larger groups
     indices = list(range(num_rivers))
@@ -67,7 +67,7 @@ def aggregate_by_day(path_Qout, write_frequency=500):
         # on the rapid docker image, the dimensions are rivid, time, i think
         arr = np.asarray(source_nc.variables['Qout'][start_index:end_index, 0:number_hours])
         arr = np.transpose(arr)
-        print(arr.shape)
+        logging.info(arr.shape)
 
         minlist = []
         meanlist = []
@@ -88,14 +88,15 @@ def aggregate_by_day(path_Qout, write_frequency=500):
         mean_arr = np.asarray(meanlist)
         max_arr = np.asarray(maxlist)
 
-        print(min_arr.shape)
-        print(mean_arr.shape)
-        print(max_arr.shape)
+        logging.info(min_arr.shape)
+        logging.info(mean_arr.shape)
+        logging.info(max_arr.shape)
 
+        logging.info('  writing Qmin group')
         new_nc.variables['Qout_min'][:, start_index:end_index] = min_arr
-        logging.info('  writing Qmean group of 500')
+        logging.info('  writing Qmean group')
         new_nc.variables['Qout_mean'][:, start_index:end_index] = mean_arr
-        logging.info('  writing Qmax group of 500')
+        logging.info('  writing Qmax group')
         new_nc.variables['Qout_max'][:, start_index:end_index] = max_arr
         new_nc.sync()
 
