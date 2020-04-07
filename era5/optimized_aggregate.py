@@ -49,13 +49,13 @@ def aggregate_by_day(path_Qout, write_frequency=500):
     print(num_rivers)
 
     # create a set of indices for slicing the array in larger groups
-    pairs_of_indices = list(range(num_rivers))
+    indices = list(range(num_rivers))
     index_pairs = []
-    while len(pairs_of_indices) > 0:
-        arr = pairs_of_indices[:write_frequency]
+    while len(indices) > 0:
+        arr = indices[:write_frequency]
         index_pairs.append((arr[0], arr[-1]))
-        pairs_of_indices = pairs_of_indices[write_frequency:]
-    number_groups = len(pairs_of_indices)
+        indices = indices[write_frequency:]
+    number_groups = len(index_pairs)
 
     for group_num, pairs in enumerate(index_pairs):
         start_index = pairs[0]
