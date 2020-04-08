@@ -6,6 +6,7 @@ import statistics
 import math
 import datetime
 import pandas
+import numpy as np
 
 
 def solve_gumbel_flow(std, xbar, rp):
@@ -27,17 +28,17 @@ def daily_to_yearly_max_flow(daily_flow_list, start_yr, end_yr):
     return yearly_max_flows
 
 
-def gumbel_return_periods(path_Qout):
+def gumbel_return_periods(path_Qout, all_at_once=False):
     # sort out the file paths
     if not os.path.isfile(path_Qout):
         raise FileNotFoundError('Qout file not found at this path')
 
-    if 'erai' in os.path.basename(path_Qout):
+    if 'erai' in str(os.path.basename(path_Qout)).lower():
         start_yr = 1980
         end_yr = 2014
         # series_len = 12784
         flow_var = 'Qout'
-    elif 'era5' in os.path.basename(path_Qout):
+    elif 'era5' in str(os.path.basename(path_Qout)).lower():
         start_yr = 1979
         end_yr = 2018
         # series_len = 350616
@@ -64,31 +65,81 @@ def gumbel_return_periods(path_Qout):
     rp_nc.createVariable('return_period_10', datatype='f4', dimensions=('rivid',))
     rp_nc.createVariable('return_period_2', datatype='f4', dimensions=('rivid',))
 
+    # determine which order of dimensions
+    if source_nc.variables[flow_var].dimensions == ('time', 'rivid'):
+        time_first = True
+    elif source_nc.variables[flow_var].dimensions == ('rivid', 'time'):
+        time_first = False
+    else:
+        logging.info('Unable to identify the order of the Qout variables\' dimensions. Exiting')
+        exit()
+
     # configure the rivid variable
     logging.info('populating the rivid variable')
     rp_nc.variables['rivid'][:] = source_nc.variables['rivid'][:]
 
     # for each river read the whole time series
     num_rivers = source_nc.dimensions['rivid'].size
-    for i in range(num_rivers):
-        logging.info(str(i) + '/' + str(num_rivers))
 
-        # order of slice is i, :
-        # yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables[flow_var][i, :], start_yr, end_yr)
-        # if it fails, it came from an old version of rapid and order is :, i
-        yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables[flow_var][:, i], start_yr, end_yr)
+    if all_at_once:
+        # lists to store all the return period values into
+        list_100 = []
+        list_50 = []
+        list_25 = []
+        list_20 = []
+        list_10 = []
+        list_2 = []
+        for i in range(num_rivers):
+            logging.info(str(i) + '/' + str(num_rivers))
 
-        xbar = statistics.mean(yearly_max_flows)
-        std = statistics.stdev(yearly_max_flows, xbar=xbar)
-        logging.info('xbar: ' + str(xbar))
-        logging.info('std: ' + str(std))
-        rp_nc.variables['return_period_100'][i] = solve_gumbel_flow(std, xbar, 100)
-        rp_nc.variables['return_period_50'][i] = solve_gumbel_flow(std, xbar, 50)
-        rp_nc.variables['return_period_25'][i] = solve_gumbel_flow(std, xbar, 25)
-        rp_nc.variables['return_period_20'][i] = solve_gumbel_flow(std, xbar, 20)
-        rp_nc.variables['return_period_10'][i] = solve_gumbel_flow(std, xbar, 10)
-        rp_nc.variables['return_period_2'][i] = solve_gumbel_flow(std, xbar, 2)
+            # slice the array propertly based on the order of the dimensions
+            if time_first:
+                yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables[flow_var][:, i], start_yr, end_yr)
+            else:
+                yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables[flow_var][i, :], start_yr, end_yr)
+
+            xbar = statistics.mean(yearly_max_flows)
+            std = statistics.stdev(yearly_max_flows, xbar=xbar)
+            # logging.info('xbar: ' + str(xbar))
+            # logging.info('std: ' + str(std))
+            list_100.append(solve_gumbel_flow(std, xbar, 100))
+            list_50.append(solve_gumbel_flow(std, xbar, 50))
+            list_25.append(solve_gumbel_flow(std, xbar, 25))
+            list_20.append(solve_gumbel_flow(std, xbar, 20))
+            list_10.append(solve_gumbel_flow(std, xbar, 10))
+            list_2.append(solve_gumbel_flow(std, xbar, 2))
+
+        source_nc.close()
+
+        rp_nc.variables['return_period_100'][:] = np.asarray(list_100)
+        rp_nc.variables['return_period_50'][:] = np.asarray(list_50)
+        rp_nc.variables['return_period_25'][:] = np.asarray(list_25)
+        rp_nc.variables['return_period_20'][:] = np.asarray(list_20)
+        rp_nc.variables['return_period_10'][:] = np.asarray(list_10)
+        rp_nc.variables['return_period_2'][:] = np.asarray(list_2)
         rp_nc.sync()
+
+    else:
+        for i in range(num_rivers):
+            logging.info(str(i) + '/' + str(num_rivers))
+
+            # slice the array propertly based on the order of the dimensions
+            if time_first:
+                yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables[flow_var][:, i], start_yr, end_yr)
+            else:
+                yearly_max_flows = daily_to_yearly_max_flow(source_nc.variables[flow_var][i, :], start_yr, end_yr)
+
+            xbar = statistics.mean(yearly_max_flows)
+            std = statistics.stdev(yearly_max_flows, xbar=xbar)
+            # logging.info('xbar: ' + str(xbar))
+            # logging.info('std: ' + str(std))
+            rp_nc.variables['return_period_100'][i] = solve_gumbel_flow(std, xbar, 100)
+            rp_nc.variables['return_period_50'][i] = solve_gumbel_flow(std, xbar, 50)
+            rp_nc.variables['return_period_25'][i] = solve_gumbel_flow(std, xbar, 25)
+            rp_nc.variables['return_period_20'][i] = solve_gumbel_flow(std, xbar, 20)
+            rp_nc.variables['return_period_10'][i] = solve_gumbel_flow(std, xbar, 10)
+            rp_nc.variables['return_period_2'][i] = solve_gumbel_flow(std, xbar, 2)
+            rp_nc.sync()
 
     rp_nc.close()
     source_nc.close()
@@ -106,28 +157,6 @@ if __name__ == '__main__':
     sys.argv[2] path to log file
     """
     # enable logging to track the progress of the workflow and for debugging
-    logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.info, format='%(message)s')
+    logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.INFO, format='%(message)s')
     logging.info('Gumbel Return Period Processing started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
-    gumbel_return_periods(sys.argv[1])
-
-
-# logging.basicConfig(filename='/Users/rileyhales/Downloads/INTERIM/log.log', filemode='w', level=logging.INFO, format='%(message)s')
-# intfiles = (
-    # '/Users/rileyhales/Downloads/INTERIM/africa-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/australia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/central_america-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/central_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/east_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/europe-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/japan-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/middle_east-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/north_america-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/south_america-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/south_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-    # '/Users/rileyhales/Downloads/INTERIM/west_asia-geoglows/Qout_erai_t511_24hr_19800101to20141231.nc',
-# )
-
-# for intfile in intfiles:
-#     print(os.path.basename(os.path.dirname(intfile)))
-#     logging.info('Gumbel Return Period Processing started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
-#     gumbel_return_periods(intfile)
+    gumbel_return_periods(sys.argv[1], all_at_once=False)
