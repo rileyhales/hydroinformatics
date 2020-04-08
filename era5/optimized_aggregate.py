@@ -38,7 +38,6 @@ def aggregate_by_day(path_Qout, write_frequency=500):
     new_nc.variables['time'].__dict__['calendar'] = 'gregorian'
 
     # configure the rivid variable
-    logging.info('populating the rivid variable')
     new_nc.variables['rivid'][:] = source_nc.variables['rivid'][:]
 
     # collect information used to create iteration parameters
@@ -47,6 +46,13 @@ def aggregate_by_day(path_Qout, write_frequency=500):
     number_days = number_hours / 24
     hours_in_day = 24
     logging.info('number of rivers: ' + str(num_rivers))
+    if source_nc.variables['Qout'].dimensions == ('time', 'rivid'):
+        time_first = True
+    elif source_nc.variables['Qout'].dimensions == ('rivid', 'time'):
+        time_first = False
+    else:
+        logging.info('Unable to identify the order of the Qout variables\' dimensions. Exiting')
+        exit()
 
     # create a set of indices for slicing the array in larger groups
     indices = list(range(num_rivers))
@@ -63,30 +69,33 @@ def aggregate_by_day(path_Qout, write_frequency=500):
         logging.info('Started group ' + str(group_num) + '/' + str(number_groups) + ' -- ' + datetime.datetime.utcnow().strftime("%c"))
 
         # on the sample outputs the dimensions are time, rivid
-        # arr = np.asarray(source_nc.variables['Qout'][0:number_hours, start_index:end_index])
+        if time_first:
+            arr = np.asarray(source_nc.variables['Qout'][0:number_hours, start_index:end_index])
         # on the rapid docker image, the dimensions are rivid, time, i think
-        arr = np.asarray(source_nc.variables['Qout'][start_index:end_index, 0:number_hours])
-        arr = np.transpose(arr)
+        else:
+            arr = np.asarray(source_nc.variables['Qout'][start_index:end_index, 0:number_hours])
+            arr = np.transpose(arr)
+
         logging.info(arr.shape)
 
-        minlist = []
-        meanlist = []
-        maxlist = []
+        min_arr = []
+        mean_arr = []
+        max_arr = []
 
         # if the array is at least 'size' long
         for day_flows in np.split(arr, number_days):
             # take the first 'size' pieces
             # get the min, mean, max and put them into a list
-            minlist.append(day_flows.min(axis=0))
+            min_arr.append(day_flows.min(axis=0))
             # print(minlist)
-            meanlist.append(day_flows.mean(axis=0))
-            maxlist.append(day_flows.max(axis=0))
+            mean_arr.append(day_flows.mean(axis=0))
+            max_arr.append(day_flows.max(axis=0))
             # drop the first 'size' elements in the array
             arr = arr[hours_in_day:]
 
-        min_arr = np.asarray(minlist)
-        mean_arr = np.asarray(meanlist)
-        max_arr = np.asarray(maxlist)
+        min_arr = np.asarray(min_arr)
+        mean_arr = np.asarray(mean_arr)
+        max_arr = np.asarray(max_arr)
 
         logging.info(min_arr.shape)
         logging.info(mean_arr.shape)
@@ -118,6 +127,6 @@ if __name__ == '__main__':
     sys.argv[2] path to log file
     """
     # enable logging to track the progress of the workflow and for debugging
-    logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.INFO, format='%(message)s')
-    logging.info('ERA5 aggregation started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
+    # logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.INFO, format='%(message)s')
+    # logging.info('ERA5 aggregation started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
     aggregate_by_day(sys.argv[1], write_frequency=1000)
