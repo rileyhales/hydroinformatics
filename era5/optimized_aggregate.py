@@ -3,11 +3,14 @@ Copyright Riley Hales
 April 6 2020
 """
 import netCDF4
+import xarray
 import numpy as np
 import os
+import pandas as pd
 import sys
 import logging
 import datetime
+import plotly.graph_objs as go
 
 
 def aggregate_by_day(path_Qout, write_frequency=500):
@@ -119,6 +122,59 @@ def aggregate_by_day(path_Qout, write_frequency=500):
     return newfilepath
 
 
+def validate_aggregated_rivid(path_Qout, path_Aggregated_qout, rivid=None):
+    old_xar = xarray.open_dataset(path_Qout)
+    new_xar = xarray.open_dataset(path_Aggregated_qout)
+
+    if not rivid:
+        rivid = int(np.random.choice(new_xar.variables['rivid'], 1))
+
+    old_times = pd.to_datetime(pd.Series(old_xar.sel(rivid=rivid).time))
+    oldflow = np.asarray(old_xar.sel(rivid=rivid).Qout)
+    new_times = np.asarray(new_xar.sel(rivid=rivid).time)
+    newmin = np.asarray(new_xar.sel(rivid=rivid).Qout_min)
+    newmean = np.asarray(new_xar.sel(rivid=rivid).Qout_mean)
+    newmax = np.asarray(new_xar.sel(rivid=rivid).Qout_max)
+
+    start = datetime.datetime(year=1979, month=1, day=1)
+    new_times = [start + datetime.timedelta(days=int(i)) for i in new_times]
+
+    new_scatter_min = go.Scatter(
+        name='new_data_min',
+        x=new_times,
+        y=list(newmin),
+        line={'color': 'yellow'}
+    )
+    new_scatter_mean = go.Scatter(
+        name='new_data_mean',
+        x=new_times,
+        y=list(newmean),
+        line={'color': 'black'}
+    )
+    new_scatter_max = go.Scatter(
+        name='new_data_max',
+        x=new_times,
+        y=list(newmax),
+        line={'color': 'blue'}
+    )
+    old_scatter = go.Scatter(
+        name='old_flow',
+        x=old_times,
+        y=list(oldflow),
+        line={'color': 'red'}
+    )
+    layout = go.Layout(
+        title='Aggregation Comparison',
+        xaxis={'title': 'Date', 'range': [10000, 15000]},
+        yaxis={'title': 'Streamflow (m<sup>3</sup>/s)'},
+    )
+
+    figure = go.Figure((new_scatter_min, new_scatter_mean, new_scatter_max, old_scatter), layout=layout)
+    figure.show()
+
+    return
+
+
 # for running this script from the command line with a script
 if __name__ == '__main__':
     """
@@ -127,6 +183,7 @@ if __name__ == '__main__':
     sys.argv[2] path to log file
     """
     # enable logging to track the progress of the workflow and for debugging
-    # logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.INFO, format='%(message)s')
-    # logging.info('ERA5 aggregation started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
-    aggregate_by_day(sys.argv[1], write_frequency=1000)
+    logging.basicConfig(filename=sys.argv[2], filemode='w', level=logging.INFO, format='%(message)s')
+    logging.info('ERA5 aggregation started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
+    aggregated_file = aggregate_by_day(sys.argv[1], write_frequency=1000)
+    # validate_aggregated_rivid(sys.argv[1], aggregated_file)
