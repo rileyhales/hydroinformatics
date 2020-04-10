@@ -6,7 +6,6 @@ import statistics
 import math
 import datetime
 import pandas
-import numpy as np
 
 
 def solve_gumbel_flow(std, xbar, rp):
@@ -45,7 +44,7 @@ def gumbel_return_periods(path_Qout, all_at_once=False):
     else:
         raise ValueError('unrecognized file, should be erai or era5')
 
-    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'Gumbel_ERA5_return_periods.nc4')
+    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'Gumbel_return_periods_era5.nc4')
 
     # read the netcdfs
     source_nc = netCDF4.Dataset(filename=path_Qout, mode='r')
@@ -80,13 +79,6 @@ def gumbel_return_periods(path_Qout, all_at_once=False):
     # for each river read the whole time series
     num_rivers = source_nc.dimensions['rivid'].size
 
-    # lists to store all the return period values into
-    list_100 = []
-    list_50 = []
-    list_25 = []
-    list_20 = []
-    list_10 = []
-    list_2 = []
     for i in range(num_rivers):
         logging.info(str(i) + '/' + str(num_rivers))
 
@@ -98,23 +90,17 @@ def gumbel_return_periods(path_Qout, all_at_once=False):
 
         xbar = statistics.mean(yearly_max_flows)
         std = statistics.stdev(yearly_max_flows, xbar=xbar)
-        list_100.append(solve_gumbel_flow(std, xbar, 100))
-        list_50.append(solve_gumbel_flow(std, xbar, 50))
-        list_25.append(solve_gumbel_flow(std, xbar, 25))
-        list_20.append(solve_gumbel_flow(std, xbar, 20))
-        list_10.append(solve_gumbel_flow(std, xbar, 10))
-        list_2.append(solve_gumbel_flow(std, xbar, 2))
+        # logging.info('xbar: ' + str(xbar))
+        # logging.info('std: ' + str(std))
+        rp_nc.variables['return_period_100'][i] = solve_gumbel_flow(std, xbar, 100)
+        rp_nc.variables['return_period_50'][i] = solve_gumbel_flow(std, xbar, 50)
+        rp_nc.variables['return_period_25'][i] = solve_gumbel_flow(std, xbar, 25)
+        rp_nc.variables['return_period_20'][i] = solve_gumbel_flow(std, xbar, 20)
+        rp_nc.variables['return_period_10'][i] = solve_gumbel_flow(std, xbar, 10)
+        rp_nc.variables['return_period_2'][i] = solve_gumbel_flow(std, xbar, 2)
+        rp_nc.sync()
 
     source_nc.close()
-
-    rp_nc.variables['return_period_100'][:] = np.asarray(list_100)
-    rp_nc.variables['return_period_50'][:] = np.asarray(list_50)
-    rp_nc.variables['return_period_25'][:] = np.asarray(list_25)
-    rp_nc.variables['return_period_20'][:] = np.asarray(list_20)
-    rp_nc.variables['return_period_10'][:] = np.asarray(list_10)
-    rp_nc.variables['return_period_2'][:] = np.asarray(list_2)
-    rp_nc.sync()
-
     logging.info('')
     logging.info('FINISHED')
     logging.info(datetime.datetime.utcnow().strftime("%D at %R"))
