@@ -31,9 +31,9 @@ def aggregate_by_day(path_Qout, write_frequency=500):
     new_nc.createVariable('rivid', datatype='f4', dimensions=('rivid',))
     new_nc.createVariable('time', datatype='f4', dimensions=('time',))
     # create the variables for the flows
-    new_nc.createVariable('Qout_min', datatype='f4', dimensions=('time', 'rivid'))
-    new_nc.createVariable('Qout_mean', datatype='f4', dimensions=('time', 'rivid'))
-    new_nc.createVariable('Qout_max', datatype='f4', dimensions=('time', 'rivid'))
+    # new_nc.createVariable('Qout_min', datatype='f4', dimensions=('time', 'rivid'))
+    new_nc.createVariable('Qout', datatype='f4', dimensions=('time', 'rivid'))
+    # new_nc.createVariable('Qout_max', datatype='f4', dimensions=('time', 'rivid'))
 
     # configure the time variable
     new_nc.variables['time'][:] = range(new_nc.dimensions['time'].size)
@@ -47,15 +47,7 @@ def aggregate_by_day(path_Qout, write_frequency=500):
     num_rivers = source_nc.dimensions['rivid'].size
     number_hours = source_nc.variables['time'].shape[0] - 1
     number_days = number_hours / 24
-    hours_in_day = 24
     logging.info('number of rivers: ' + str(num_rivers))
-    if source_nc.variables['Qout'].dimensions == ('time', 'rivid'):
-        time_first = True
-    elif source_nc.variables['Qout'].dimensions == ('rivid', 'time'):
-        time_first = False
-    else:
-        logging.info('Unable to identify the order of the Qout variables\' dimensions. Exiting')
-        exit()
 
     # create a set of indices for slicing the array in larger groups
     indices = list(range(num_rivers))
@@ -72,44 +64,41 @@ def aggregate_by_day(path_Qout, write_frequency=500):
         logging.info('Started group ' + str(group_num) + '/' + str(number_groups) + ' -- ' + datetime.datetime.utcnow().strftime("%c"))
 
         # on the sample outputs the dimensions are time, rivid
-        if time_first:
+        if source_nc.variables['Qout'].dimensions == ('time', 'rivid'):
             arr = np.asarray(source_nc.variables['Qout'][0:number_hours, start_index:end_index])
         # on the rapid docker image, the dimensions are rivid, time, i think
+        elif source_nc.variables['Qout'].dimensions == ('rivid', 'time'):
+            arr = np.transpose(np.asarray(source_nc.variables['Qout'][start_index:end_index, 0:number_hours]))
         else:
-            arr = np.asarray(source_nc.variables['Qout'][start_index:end_index, 0:number_hours])
-            arr = np.transpose(arr)
+            logging.info('Unable to recognize the dimension order, exiting')
+            exit()
 
         logging.info(arr.shape)
 
-        min_arr = []
+        # min_arr = []
         mean_arr = []
-        max_arr = []
+        # max_arr = []
 
         # if the array is at least 'size' long
         for day_flows in np.split(arr, number_days):
-            # take the first 'size' pieces
-            # get the min, mean, max and put them into a list
-            min_arr.append(day_flows.min(axis=0))
-            # print(minlist)
+            # min_arr.append(day_flows.min(axis=0))
             mean_arr.append(day_flows.mean(axis=0))
-            max_arr.append(day_flows.max(axis=0))
-            # drop the first 'size' elements in the array
-            arr = arr[hours_in_day:]
+            # max_arr.append(day_flows.max(axis=0))
 
-        min_arr = np.asarray(min_arr)
+        # min_arr = np.asarray(min_arr)
         mean_arr = np.asarray(mean_arr)
-        max_arr = np.asarray(max_arr)
+        # max_arr = np.asarray(max_arr)
 
-        logging.info(min_arr.shape)
+        # logging.info(min_arr.shape)
         logging.info(mean_arr.shape)
-        logging.info(max_arr.shape)
+        # logging.info(max_arr.shape)
 
-        logging.info('  writing Qmin group')
-        new_nc.variables['Qout_min'][:, start_index:end_index] = min_arr
-        logging.info('  writing Qmean group')
-        new_nc.variables['Qout_mean'][:, start_index:end_index] = mean_arr
-        logging.info('  writing Qmax group')
-        new_nc.variables['Qout_max'][:, start_index:end_index] = max_arr
+        # logging.info('  writing Qmin group')
+        # new_nc.variables['Qout_min'][:, start_index:end_index] = min_arr
+        logging.info('  writing Qout group')
+        new_nc.variables['Qout'][:, start_index:end_index] = mean_arr
+        # logging.info('  writing Qmax group')
+        # new_nc.variables['Qout_max'][:, start_index:end_index] = max_arr
         new_nc.sync()
 
     # close the new netcdf
