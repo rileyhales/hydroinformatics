@@ -45,7 +45,9 @@ def aggregate_by_day(path_Qout, write_frequency=500):
 
     # collect information used to create iteration parameters
     num_rivers = source_nc.dimensions['rivid'].size
-    number_hours = source_nc.variables['time'].shape[0] - 1
+    number_hours = source_nc.variables['time'].shape[0]
+    if number_hours != 350640:
+        raise RuntimeError('expected a time variable length of 350640 but got something else. check the variable')
     number_days = number_hours / 24
     logging.info('number of rivers: ' + str(num_rivers))
 
@@ -63,12 +65,11 @@ def aggregate_by_day(path_Qout, write_frequency=500):
         end_index = pairs[1]
         logging.info('Started group ' + str(group_num) + '/' + str(number_groups) + ' -- ' + datetime.datetime.utcnow().strftime("%c"))
 
-        # on the sample outputs the dimensions are time, rivid
+        # depending on the version of rapid used, the dimension order is different
         if source_nc.variables['Qout'].dimensions == ('time', 'rivid'):
-            arr = np.asarray(source_nc.variables['Qout'][0:number_hours, start_index:end_index])
-        # on the rapid docker image, the dimensions are rivid, time, i think
+            arr = np.asarray(source_nc.variables['Qout'][:, start_index:end_index])
         elif source_nc.variables['Qout'].dimensions == ('rivid', 'time'):
-            arr = np.transpose(np.asarray(source_nc.variables['Qout'][start_index:end_index, 0:number_hours]))
+            arr = np.transpose(np.asarray(source_nc.variables['Qout'][start_index:end_index, :]))
         else:
             logging.info('Unable to recognize the dimension order, exiting')
             exit()

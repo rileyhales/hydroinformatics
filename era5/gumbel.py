@@ -44,7 +44,7 @@ def gumbel_return_periods(path_Qout, all_at_once=False):
     else:
         raise ValueError('unrecognized file, should be erai or era5')
 
-    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'Gumbel_return_periods_era5.nc4')
+    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'Gumbel_era5_return_periods.nc4')
 
     # read the netcdfs
     source_nc = netCDF4.Dataset(filename=path_Qout, mode='r')
