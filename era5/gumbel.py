@@ -33,20 +33,19 @@ def gumbel_return_periods(path_Qout, all_at_once=False):
     if not os.path.isfile(path_Qout):
         raise FileNotFoundError('Qout file not found at this path')
 
+    flow_var = 'Qout'
     if 'erai' in str(os.path.basename(path_Qout)).lower():
         start_yr = 1980
         end_yr = 2014
         # series_len = 12784
-        flow_var = 'Qout'
     elif 'era5' in str(os.path.basename(path_Qout)).lower():
         start_yr = 1979
         end_yr = 2018
         # series_len = 350616
-        flow_var = 'Qout_max'
     else:
         raise ValueError('unrecognized file, should be erai or era5')
 
-    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'Gumbel_return_periods_era5.nc4')
+    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'Gumbel_ERA5_return_periods.nc4')
 
     # read the netcdfs
     source_nc = netCDF4.Dataset(filename=path_Qout, mode='r')
