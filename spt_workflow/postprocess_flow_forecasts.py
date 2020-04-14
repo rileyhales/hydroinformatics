@@ -80,7 +80,7 @@ def check_for_return_period_flow(largeflows_df, forecasted_flows_df, stream_orde
     #     date_r100 = get_time_of_first_exceedence(forecasted_flows_df, r100)
 
     return largeflows_df.append({
-        'comid': rp_data.index,
+        'comid': rp_data.index[0],
         'stream_order': stream_order,
         'stream_lat': rp_data['lat'],
         'stream_lon': rp_data['lon'],
