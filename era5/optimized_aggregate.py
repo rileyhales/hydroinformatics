@@ -46,8 +46,13 @@ def aggregate_by_day(path_Qout, write_frequency=500):
     # collect information used to create iteration parameters
     num_rivers = source_nc.dimensions['rivid'].size
     number_hours = source_nc.variables['time'].shape[0]
-    if number_hours != 350640:
-        raise RuntimeError('expected a time variable length of 350640 but got something else. check the variable')
+    if number_hours == 350641:
+        logging.info('----WARNING---- TIME 350641 (expected 350640)')
+        exact = False
+    elif number_hours == 350640:
+        exact = True
+    else:
+        raise RuntimeError('unexpected length of times found.')
     number_days = number_hours / 24
     logging.info('number of rivers: ' + str(num_rivers))
 
@@ -67,9 +72,15 @@ def aggregate_by_day(path_Qout, write_frequency=500):
 
         # depending on the version of rapid used, the dimension order is different
         if source_nc.variables['Qout'].dimensions == ('time', 'rivid'):
-            arr = np.asarray(source_nc.variables['Qout'][:, start_index:end_index])
+            if exact:
+                arr = np.asarray(source_nc.variables['Qout'][:, start_index:end_index])
+            elif not exact:
+                arr = np.asarray(source_nc.variables['Qout'][0:number_hours, start_index:end_index])
         elif source_nc.variables['Qout'].dimensions == ('rivid', 'time'):
-            arr = np.transpose(np.asarray(source_nc.variables['Qout'][start_index:end_index, :]))
+            if exact:
+                arr = np.transpose(np.asarray(source_nc.variables['Qout'][start_index:end_index, :]))
+            elif not exact:
+                arr = np.transpose(np.asarray(source_nc.variables['Qout'][start_index:end_index, 0:number_hours]))
         else:
             logging.info('Unable to recognize the dimension order, exiting')
             exit()
