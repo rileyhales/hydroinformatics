@@ -92,7 +92,7 @@ def aggregate_by_day(path_Qout, write_frequency=500):
         # max_arr = []
 
         # if the array is at least 'size' long
-        logging.info('splitting the array into {0) days'.format(number_days))
+        logging.info('splitting the array into {0} days'.format(number_days))
         for day_flows in np.split(arr, number_days):
             # min_arr.append(day_flows.min(axis=0))
             mean_arr.append(day_flows.mean(axis=0))
