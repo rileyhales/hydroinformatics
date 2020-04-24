@@ -75,12 +75,12 @@ def aggregate_by_day(path_Qout, write_frequency=500):
             if exact:
                 arr = np.asarray(source_nc.variables['Qout'][:, start_index:end_index])
             elif not exact:
-                arr = np.asarray(source_nc.variables['Qout'][0:number_hours, start_index:end_index])
+                arr = np.asarray(source_nc.variables['Qout'][0:350640, start_index:end_index])
         elif source_nc.variables['Qout'].dimensions == ('rivid', 'time'):
             if exact:
                 arr = np.transpose(np.asarray(source_nc.variables['Qout'][start_index:end_index, :]))
             elif not exact:
-                arr = np.transpose(np.asarray(source_nc.variables['Qout'][start_index:end_index, 0:number_hours]))
+                arr = np.transpose(np.asarray(source_nc.variables['Qout'][start_index:end_index, 0:350640]))
         else:
             logging.info('Unable to recognize the dimension order, exiting')
             exit()
