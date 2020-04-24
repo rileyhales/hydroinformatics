@@ -30,6 +30,7 @@ def daily_to_yearly_max_flow(daily_flow_list, start_yr, end_yr):
 def gumbel_return_periods(path_Qout):
     # sort out the file paths
     if not os.path.isfile(path_Qout):
+        logging.info(path_Qout)
         raise FileNotFoundError('Qout file not found at this path')
 
     flow_var = 'Qout'
