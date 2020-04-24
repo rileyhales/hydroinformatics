@@ -27,7 +27,7 @@ def daily_to_yearly_max_flow(daily_flow_list, start_yr, end_yr):
     return yearly_max_flows
 
 
-def gumbel_return_periods(path_Qout, all_at_once=False):
+def gumbel_return_periods(path_Qout):
     # sort out the file paths
     if not os.path.isfile(path_Qout):
         raise FileNotFoundError('Qout file not found at this path')
@@ -44,7 +44,7 @@ def gumbel_return_periods(path_Qout, all_at_once=False):
     else:
         raise ValueError('unrecognized file, should be erai or era5')
 
-    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'Gumbel_era5_return_periods.nc4')
+    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'Gumbel_return_periods.nc4')
 
     # read the netcdfs
     source_nc = netCDF4.Dataset(filename=path_Qout, mode='r')
@@ -59,8 +59,8 @@ def gumbel_return_periods(path_Qout, all_at_once=False):
     rp_nc.createVariable('return_period_100', datatype='f4', dimensions=('rivid',))
     rp_nc.createVariable('return_period_50', datatype='f4', dimensions=('rivid',))
     rp_nc.createVariable('return_period_25', datatype='f4', dimensions=('rivid',))
-    rp_nc.createVariable('return_period_20', datatype='f4', dimensions=('rivid',))
     rp_nc.createVariable('return_period_10', datatype='f4', dimensions=('rivid',))
+    rp_nc.createVariable('return_period_5', datatype='f4', dimensions=('rivid',))
     rp_nc.createVariable('return_period_2', datatype='f4', dimensions=('rivid',))
 
     # determine which order of dimensions
@@ -90,13 +90,11 @@ def gumbel_return_periods(path_Qout, all_at_once=False):
 
         xbar = statistics.mean(yearly_max_flows)
         std = statistics.stdev(yearly_max_flows, xbar=xbar)
-        # logging.info('xbar: ' + str(xbar))
-        # logging.info('std: ' + str(std))
         rp_nc.variables['return_period_100'][i] = solve_gumbel_flow(std, xbar, 100)
         rp_nc.variables['return_period_50'][i] = solve_gumbel_flow(std, xbar, 50)
         rp_nc.variables['return_period_25'][i] = solve_gumbel_flow(std, xbar, 25)
-        rp_nc.variables['return_period_20'][i] = solve_gumbel_flow(std, xbar, 20)
         rp_nc.variables['return_period_10'][i] = solve_gumbel_flow(std, xbar, 10)
+        rp_nc.variables['return_period_5'][i] = solve_gumbel_flow(std, xbar, 5)
         rp_nc.variables['return_period_2'][i] = solve_gumbel_flow(std, xbar, 2)
         rp_nc.sync()
 
@@ -110,7 +108,7 @@ def gumbel_return_periods(path_Qout, all_at_once=False):
 # for running this script from the command line with a script
 if __name__ == '__main__':
     """
-    sys.argv[0] this script e.g. gumbel.py
+    sys.argv[0] this script e.g. generate_gumbel_return_periods.py
     sys.argv[1] path to Qout file
     sys.argv[2] path to directory for storing logs
     """
@@ -122,4 +120,4 @@ if __name__ == '__main__':
         format='%(message)s'
     )
     logging.info('Gumbel Return Period Processing started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
-    gumbel_return_periods(sys.argv[1], all_at_once=True)
+    gumbel_return_periods(sys.argv[1])
