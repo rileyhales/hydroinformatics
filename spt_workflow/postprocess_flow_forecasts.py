@@ -82,8 +82,8 @@ def check_for_return_period_flow(largeflows_df, forecasted_flows_df, stream_orde
     return largeflows_df.append({
         'comid': rp_data.index[0],
         'stream_order': stream_order,
-        'stream_lat': rp_data['lat'],
-        'stream_lon': rp_data['lon'],
+        'stream_lat': float(rp_data['lat'].values),
+        'stream_lon': float(rp_data['lon'].values),
         'max_flow': max_flow,
         'date_r2': date_r2,
         'date_r10': date_r10,
@@ -148,7 +148,7 @@ def postprocess_region(region, rapidio, historical_sim, forecast_records):
 
         # if stream order is larger than 2, check if it needs to be included on the return periods summary csv
         if comid in large_list:
-            order = large_streams_df[large_streams_df.COMID == comid]['order_']
+            order = int(large_streams_df[large_streams_df.COMID == comid]['order_'].values)
             rp_data = return_period_data[return_period_data.index == comid]
             largeflows = check_for_return_period_flow(largeflows, forecasted_flows, order, rp_data)
 

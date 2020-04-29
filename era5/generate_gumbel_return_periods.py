@@ -54,8 +54,12 @@ def gumbel_return_periods(path_Qout):
     # create rivid and time dimensions
     logging.info('creating new netcdf variables/dimensions')
     rp_nc.createDimension('rivid', size=source_nc.dimensions['rivid'].size)
+    rp_nc.createDimension('lat', size=source_nc.dimensions['lat'].size)
+    rp_nc.createDimension('lon', size=source_nc.dimensions['lon'].size)
     # create rivid and time variables
     rp_nc.createVariable('rivid', datatype='f4', dimensions=('rivid',))
+    # create lat and lon variables
+    rp_nc.createVariable('lat', datatype='f4', dimensions=('rivid',))
     # create the variables for the flows
     rp_nc.createVariable('return_period_100', datatype='f4', dimensions=('rivid',))
     rp_nc.createVariable('return_period_50', datatype='f4', dimensions=('rivid',))
