@@ -151,8 +151,71 @@ def postprocess_region(region, rapidio, historical_sim, forecast_records):
             rp_data = return_period_data[return_period_data.index == comid]
             largeflows = check_for_return_period_flow(largeflows, forecasted_flows, order, rp_data)
 
+    # add the dataframe of forecasted flows to the forecast records file for this region
+    logging.info('  updating the forecast records file')
+    try:
+        update_forecast_records(region, forecast_records, qout_folder, year, first_day_flows, times)
+    except Exception as excp:
+        logging.info('  unexpected error updating the forecast records')
+        logging.info(excp)
+
     # now save the return periods summary csv to the right output directory
     largeflows.to_csv(os.path.join(qout_folder, 'forecasted_return_periods_summary.csv'), index=False)
+
+    return
+
+
+def update_forecast_records(region, forecast_records, qout_folder, year, first_day_flows, times):
+    record_path = os.path.join(forecast_records, region)
+    if not os.path.exists(record_path):
+        os.mkdir(record_path)
+    record_path = os.path.join(record_path, 'forecast_record-' + year + '-' + region + '.nc')
+
+    # if there isn't a forecast record for this year, make one
+    if not os.path.exists(record_path):
+        # using a forecast file as a reference
+        reference = glob.glob(os.path.join(qout_folder, 'Qout*.nc'))[0]
+        reference = nc.Dataset(reference)
+        # make a new record file
+        record = nc.Dataset(record_path, 'w')
+        # copy the right dimensions and variables
+        record.createDimension('time', None)
+        record.createDimension('rivid', reference.dimensions['rivid'].size)
+        record.createVariable('time', reference.variables['time'].dtype, dimensions=('time',))
+        record.variables['time'].setncattr('units', 'hours since {0}0101 00:00:00'.format(year))
+        record.createVariable('lat', reference.variables['lat'].dtype, dimensions=('rivid',))
+        record.createVariable('lon', reference.variables['lon'].dtype, dimensions=('rivid',))
+        record.createVariable('rivid', reference.variables['rivid'].dtype, dimensions=('rivid',))
+        record.createVariable('Qout', reference.variables['Qout'].dtype, dimensions=('rivid', 'time'))
+        # and also prepopulate the lat, lon, and rivid fields
+        record.variables['rivid'][:] = reference.variables['rivid'][:]
+        record.variables['lat'][:] = reference.variables['lat'][:]
+        record.variables['lon'][:] = reference.variables['lon'][:]
+
+        # calculate the number of 3-hourly timesteps that will occur this year and store them in the time variable
+        date = datetime.datetime(year=int(year), month=1, day=1, hour=0, minute=0, second=0)
+        end = int(year) + 1
+        timesteps = 0
+        while date.year < end:
+            date += datetime.timedelta(hours=3)
+            timesteps += 1
+        record.variables['time'][:] = [i * 3 for i in range(timesteps)]
+        record.close()
+
+    # open the record netcdf
+    logging.info('  writing first day flows to forecast record netcdf')
+    record_netcdf = xarray.open_dataset(record_path)
+
+    # append the data
+    record_times = list(record_netcdf.variables['time'].data)
+    start_time_index = record_times.index(times[0])
+    end_time_index = start_time_index + len(first_day_flows[0])
+    # convert all those saved flows to a np array and write to the netcdf
+    first_day_flows = np.asarray(first_day_flows)
+    record_netcdf.variables['Qout'][:, start_time_index:end_time_index] = first_day_flows
+
+    # save and close the netcdf
+    record_netcdf.close()
 
     return
 
@@ -166,14 +229,10 @@ if __name__ == '__main__':
     arg4 = path to the logs directory
     """
     # accept the arguments
-    # rapidio = sys.argv[1]
-    # historical_sim = sys.argv[2]
-    # forecast_records = sys.argv[3]
-    # logs_dir = sys.argv[4]
-    rapidio = '/Users/rileyhales/SpatialData/streamflow/rapid-io'
-    historical_sim = '/Users/rileyhales/SpatialData/streamflow/era-interim'
-    forecast_records = '/Users/rileyhales/SpatialData/streamflow/forecast-records'
-    logs_dir = '/Users/rileyhales/SpatialData/streamflow/logs'
+    rapidio = sys.argv[1]
+    historical_sim = sys.argv[2]
+    forecast_records = sys.argv[3]
+    logs_dir = sys.argv[4]
 
     # list of regions to be processed based on their forecasts
     regions = os.listdir(os.path.join(rapidio, 'input'))
