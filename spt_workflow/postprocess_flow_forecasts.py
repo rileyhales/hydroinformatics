@@ -45,7 +45,6 @@ def check_for_return_period_flow(largeflows_df, forecasted_flows_df, stream_orde
     max_flow = max(forecasted_flows_df['means'])
 
     # temporary dates
-    date_r2 = ''
     date_r10 = ''
     date_r20 = ''
     date_r25 = ''
@@ -112,29 +111,29 @@ def postprocess_region(region, rapidio, historical_sim, forecast_records):
     # , 'date_r25', 'date_r50', 'date_r100'])
 
     # merge the most recent forecast files into a single xarray dataset
-    logging.info('merging forecasts')
+    logging.info('  merging forecasts')
     merged_forecasts, qout_folder = merge_forecast_qout_files(rapidio_region_output)
 
     # collect the times and comids from the forecasts
-    logging.info('reading info from forecasts')
+    logging.info('  reading info from forecasts')
     times = pd.to_datetime(pd.Series(merged_forecasts.time))
     comids = pd.Series(merged_forecasts.rivid)
     tomorrow = times[0] + pd.Timedelta(days=1)
     year = times[0].strftime("%Y")
 
     # read the return period file
-    logging.info('reading return period file')
-    return_period_file = glob.glob(os.path.join(historical_sim, region, '*return_period*.nc*'))[0]
+    logging.info('  reading return period file')
+    return_period_file = glob.glob(os.path.join(historical_sim, region, '*return_periods_erai*.nc*'))[0]
     return_period_data = xarray.open_dataset(return_period_file).to_dataframe()
 
     # read the list of large streams
-    logging.info('creating dataframe of large streams')
+    logging.info('  creating dataframe of large streams')
     stream_list = os.path.join(rapidio_region_input, 'large_str-' + region + '.csv')
     large_streams_df = pd.read_csv(stream_list)
-    large_list = large_streams_df['COMID'].to_list()
+    large_list = large_streams_df['COMID'].tolist()
 
     # store the first day flows in a huge array
-    logging.info('beginning to iterate over the comids')
+    logging.info('  beginning to iterate over the comids')
     first_day_flows = []
 
     # now process the mean flows for each river in the region
@@ -153,14 +152,14 @@ def postprocess_region(region, rapidio, historical_sim, forecast_records):
             largeflows = check_for_return_period_flow(largeflows, forecasted_flows, order, rp_data)
 
     # identify the netcdf used to store the forecast record
-    logging.info('searching for forecast record netcdf')
+    logging.info('  searching for forecast record netcdf')
     forecast_record_file = find_forecast_record_netcdf(region, forecast_records, qout_folder, year)
     record_times = list(forecast_record_file.variables['time'][:])
     start_time_index = record_times.index(datetime.datetime.timestamp(times[0]))
     end_time_index = start_time_index + len(first_day_flows[0])
 
     # convert all those saved flows to a np array and write to the netcdf
-    logging.info('writing first day flows to forecast record netcdf')
+    logging.info('  writing first day flows to forecast record netcdf')
     first_day_flows = np.asarray(first_day_flows)
     forecast_record_file.variables['Qout'][:, start_time_index:end_time_index] = first_day_flows
 
@@ -239,12 +238,12 @@ if __name__ == '__main__':
             # log start messages
             logging.info('')
             logging.info('WORKING ON ' + region)
-            logging.info('elapsed time: ' + str(datetime.datetime.now() - start))
+            logging.info('  elapsed time: ' + str(datetime.datetime.now() - start))
             # attempt to postprocess the region
             postprocess_region(region, rapidio, historical_sim, forecast_records)
         except Exception as e:
             logging.info(e)
-            logging.info('region failed at ' + datetime.datetime.now().strftime("%c"))
+            logging.info('      region failed at ' + datetime.datetime.now().strftime("%c"))
 
     logging.info('')
     logging.info('Finished at ' + datetime.datetime.now().strftime("%c"))
