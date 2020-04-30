@@ -6,6 +6,7 @@ import statistics
 import math
 import datetime
 import pandas
+import glob
 
 
 def solve_gumbel_flow(std, xbar, rp):
@@ -45,7 +46,7 @@ def gumbel_return_periods(path_Qout):
     else:
         raise ValueError('unrecognized file, should be erai or era5')
 
-    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'Gumbel_return_periods.nc4')
+    rp_nc_path = os.path.join(os.path.dirname(path_Qout), 'gumbel_return_periods.nc')
 
     # read the netcdfs
     source_nc = netCDF4.Dataset(filename=path_Qout, mode='r')
@@ -114,7 +115,7 @@ def gumbel_return_periods(path_Qout):
 if __name__ == '__main__':
     """
     sys.argv[0] this script e.g. generate_gumbel_return_periods.py
-    sys.argv[1] path to Qout file
+    sys.argv[1] path to Qout file or directory
     sys.argv[2] path to directory for storing logs
     """
     # enable logging to track the progress of the workflow and for debugging
@@ -125,4 +126,11 @@ if __name__ == '__main__':
         format='%(message)s'
     )
     logging.info('Gumbel Return Period Processing started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
-    gumbel_return_periods(sys.argv[1])
+    qoutpath = sys.argv[1]
+    if os.path.isdir(qoutpath):
+        files = glob.glob(os.path.join(glob.glob(qoutpath, '*', 'Qout*.nc')))
+        for file in files:
+            logging.info('Working on file ' + str(file))
+            gumbel_return_periods(file)
+    elif os.path.isfile(qoutpath):
+        gumbel_return_periods(qoutpath)
