@@ -128,7 +128,8 @@ if __name__ == '__main__':
     logging.info('Gumbel Return Period Processing started on ' + datetime.datetime.utcnow().strftime("%D at %R"))
     qoutpath = sys.argv[1]
     if os.path.isdir(qoutpath):
-        files = glob.glob(os.path.join(glob.glob(qoutpath, '*', 'Qout*.nc')))
+        files = glob.glob(os.path.join(qoutpath, '*', 'Qout*.nc'))
+        print(files)
         for file in files:
             logging.info('Working on file ' + str(file))
             gumbel_return_periods(file)
