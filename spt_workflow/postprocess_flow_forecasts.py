@@ -182,7 +182,6 @@ def update_forecast_records(region, forecast_records, qout_folder, year, first_d
         record.createDimension('time', None)
         record.createDimension('rivid', reference.dimensions['rivid'].size)
         record.createVariable('time', reference.variables['time'].dtype, dimensions=('time',))
-        record.variables['time'].setncattr('units', 'hours since {0}0101 00:00:00'.format(year))
         record.createVariable('lat', reference.variables['lat'].dtype, dimensions=('rivid',))
         record.createVariable('lon', reference.variables['lon'].dtype, dimensions=('rivid',))
         record.createVariable('rivid', reference.variables['rivid'].dtype, dimensions=('rivid',))
@@ -191,6 +190,9 @@ def update_forecast_records(region, forecast_records, qout_folder, year, first_d
         record.variables['rivid'][:] = reference.variables['rivid'][:]
         record.variables['lat'][:] = reference.variables['lat'][:]
         record.variables['lon'][:] = reference.variables['lon'][:]
+
+        # set the time variable attributes so that the
+        record.variables['time'].setncattr('units', 'hours since {0}0101 00:00:00'.format(year))
 
         # calculate the number of 3-hourly timesteps that will occur this year and store them in the time variable
         date = datetime.datetime(year=int(year), month=1, day=1, hour=0, minute=0, second=0)
@@ -204,10 +206,11 @@ def update_forecast_records(region, forecast_records, qout_folder, year, first_d
 
     # open the record netcdf
     logging.info('  writing first day flows to forecast record netcdf')
-    record_netcdf = xarray.open_dataset(record_path)
+    record_netcdf = nc.Dataset(record_path, mode='a')
 
-    # append the data
-    record_times = list(record_netcdf.variables['time'].data)
+    # figure out the right times
+    startdate = datetime.datetime(year=int(year), month=1, day=1, hour=0, minute=0, second=0)
+    record_times = [startdate + datetime.timedelta(hours=int(i)) for i in record_netcdf.variables['time'][:]]
     start_time_index = record_times.index(times[0])
     end_time_index = start_time_index + len(first_day_flows[0])
     # convert all those saved flows to a np array and write to the netcdf
@@ -215,6 +218,7 @@ def update_forecast_records(region, forecast_records, qout_folder, year, first_d
     record_netcdf.variables['Qout'][:, start_time_index:end_time_index] = first_day_flows
 
     # save and close the netcdf
+    record_netcdf.sync()
     record_netcdf.close()
 
     return
