@@ -54,6 +54,7 @@ def gen_simulated_averages(path_Qout, write_frequency=1000):
     times = pd.to_datetime(source_nc['time'][:], origin='unix', unit='s', utc=True)
 
     for group_num, pairs in enumerate(index_pairs):
+        logging.info(f'    working on group {group_num}/{len(index_pairs)}')
         start_idx = pairs[0]
         end_idx = pairs[1]
 
@@ -65,6 +66,7 @@ def gen_simulated_averages(path_Qout, write_frequency=1000):
 
         columns = source_nc['rivid'][start_idx:end_idx]
 
+        logging.info('    building dataframe 1')
         # made a dataframe of that array of flows where the index is the day of the year ('%j')
         df = pd.DataFrame(arr, index=times.strftime('%j'), columns=columns)
         # for each day of the year
@@ -79,6 +81,7 @@ def gen_simulated_averages(path_Qout, write_frequency=1000):
         # write the changes to the file on the hard drive
         new_nc.sync()
 
+        logging.info('    building dataframe 2')
         # now redo the dataframe with the months and repeat the process
         df = pd.DataFrame(arr, index=times.strftime('%m'), columns=columns)
         # for each month of the year
