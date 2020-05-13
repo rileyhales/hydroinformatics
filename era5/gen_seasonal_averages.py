@@ -3,6 +3,8 @@ import pandas as pd
 import os
 import numpy as np
 import plotly.graph_objs as go
+import logging
+import sys
 
 
 def gen_simulated_averages(path_Qout, write_frequency=1000):
@@ -169,8 +171,36 @@ def compare_with_plots(new_averages_file, old_averages_file, rivid):
 
 
 if __name__ == '__main__':
-    historical_sim_rapid_output = '/Users/riley/code/gsp_rest_api/output/era-5/japan-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc'
-    gen_simulated_averages(historical_sim_rapid_output, 1000)
+    # enable logging to track the progress of the workflow and for debugging
+    logging.basicConfig(
+        filename=f'{sys.argv[1]}/averages_processing.log',
+        filemode='w',
+        level=logging.INFO,
+        format='%(message)s'
+    )
+    logging.info('Historical Averages Processing Started')
+    files = [
+        '/home/water/mount_to_container/rapid-io/output/africa-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/australia-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/central_america-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/central_asia-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/east_asia-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/europe-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/islands-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/japan-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/middle_east-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/north_america-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/south_america-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/south_asia-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+        '/home/water/mount_to_container/rapid-io/output/west_asia-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc',
+    ]
+    for file in files:
+        try:
+            logging.info(f'starting on file:  {file}')
+            gen_simulated_averages(file, 1000)
+        except Exception as e:
+            logging.info('         FAILED!')
+            logging.info(e)
 
     # verify
     # new_averages_file = '/Users/riley/code/gsp_rest_api/output/era-5/japan-geoglows/simulated_average_flows.nc4'
