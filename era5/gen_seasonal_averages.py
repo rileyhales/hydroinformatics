@@ -1,9 +1,8 @@
-import xarray as xr
 import netCDF4 as nc
-import datetime
 import pandas as pd
 import os
 import numpy as np
+import plotly.graph_objs as go
 
 
 def gen_simulated_averages(path_Qout, write_frequency=1000):
@@ -22,11 +21,10 @@ def gen_simulated_averages(path_Qout, write_frequency=1000):
     new_nc.createDimension('rivid', size=source_nc.dimensions['rivid'].size)
     new_nc.createDimension('day_of_year', size=365)
     new_nc.createDimension('month', size=12)
-    new_nc.createDimension('lat', size=source_nc.dim)
     # create rivid and time *variables*
-    new_nc.createVariable('rivid', datatype='f4', dimensions=('rivid',))
-    new_nc.createVariable('day_of_year', datatype='f4', dimensions=('day_of_year',))
-    new_nc.createVariable('month', datatype='f4', dimensions=('month',))
+    new_nc.createVariable('rivid', datatype='i4', dimensions=('rivid',))
+    new_nc.createVariable('day_of_year', datatype='i4', dimensions=('day_of_year',))
+    new_nc.createVariable('month', datatype='i4', dimensions=('month',))
     # fill those variables with their data
     new_nc.variables['rivid'][:] = source_nc.variables['rivid'][:]
     new_nc.variables['day_of_year'][:] = list(range(1, 366))
@@ -100,6 +98,82 @@ def gen_simulated_averages(path_Qout, write_frequency=1000):
     return newfilepath
 
 
+def compare_with_plots(new_averages_file, old_averages_file, rivid):
+    newnc = nc.Dataset(new_averages_file, 'r')
+    idx = list(newnc.variables['rivid'][:]).index(rivid)
+    day_min = newnc['daily_min'][idx, :]
+    day_avg = newnc['daily_avg'][idx, :]
+    day_max = newnc['daily_max'][idx, :]
+    month_min = newnc['monthly_min'][idx, :]
+    month_avg = newnc['monthly_avg'][idx, :]
+    month_max = newnc['monthly_max'][idx, :]
+    newnc.close()
+    oldnc = nc.Dataset(old_averages_file)
+    idx = list(oldnc.variables['rivid'][:]).index(rivid)
+    old_day_min = oldnc.variables['min_flow'][idx, :]
+    old_day_avg = oldnc.variables['average_flow'][idx, :]
+    old_day_max = oldnc.variables['max_flow'][idx, :]
+    oldnc.close()
+    days = list(range(1, 366))
+    scatters = [
+        go.Scatter(
+            name='Old Min',
+            x=days,
+            y=old_day_min,
+        ),
+        go.Scatter(
+            name='New Min',
+            x=days,
+            y=day_min,
+        ),
+        go.Scatter(
+            name='Old Avg',
+            x=days,
+            y=old_day_avg,
+        ),
+        go.Scatter(
+            name='New Avg',
+            x=days,
+            y=day_avg,
+        ),
+        go.Scatter(
+            name='Old Max',
+            x=days,
+            y=old_day_max,
+        ),
+        go.Scatter(
+            name='New Max',
+            x=days,
+            y=day_max,
+        ),
+    ]
+    go.Figure(scatters).show()
+    go.Figure([
+        go.Scatter(
+            name='Monthly Min',
+            x=list(range(1, 13)),
+            y=month_min
+        ),
+        go.Scatter(
+            name='Monthly Avg',
+            x=list(range(1, 13)),
+            y=month_avg
+        ),
+        go.Scatter(
+            name='Monthly Max',
+            x=list(range(1, 13)),
+            y=month_max
+        ),
+    ]).show()
+    return
+
+
 if __name__ == '__main__':
-    historical_sim_rapid_output = '/Users/rileyhales/containers/gsp_rest_api/output/era-5/japan-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc'
-    gen_simulated_averages(historical_sim_rapid_output, 750)
+    historical_sim_rapid_output = '/Users/riley/code/gsp_rest_api/output/era-5/japan-geoglows/Qout_era5_t640_24hr_19790101to20181231.nc'
+    gen_simulated_averages(historical_sim_rapid_output, 1000)
+
+    # verify
+    # new_averages_file = '/Users/riley/code/gsp_rest_api/output/era-5/japan-geoglows/simulated_average_flows.nc4'
+    # old_averages_file = '/Users/riley/code/gsp_rest_api/output/era-5/japan-geoglows/seasonal_averages_era5_t640_24hr_19790101to20181231.nc'
+    # rivid = 3001070
+    # compare_with_plots(new_averages_file, old_averages_file, rivid)
