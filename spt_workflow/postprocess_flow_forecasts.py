@@ -4,6 +4,7 @@ postprocess_flow_forecasts.py
 Author: Riley Hales
 Copyright March 2020
 License: BSD 3 Clause
+Updated: June 2020
 
 Identifies flows forecasted to experience a return period level flow on streams from a preprocessed list of stream
 COMID's in each region
@@ -45,19 +46,19 @@ def check_for_return_period_flow(largeflows_df, forecasted_flows_df, stream_orde
     max_flow = max(forecasted_flows_df['means'])
 
     # temporary dates
+    date_r5 = ''
     date_r10 = ''
-    date_r20 = ''
     date_r25 = ''
     date_r50 = ''
     date_r100 = ''
 
     # retrieve return period flow levels from dataframe
     r2 = float(rp_data['return_period_2'].values[0])
+    r5 = float(rp_data['return_period_5'].values[0])
     r10 = float(rp_data['return_period_10'].values[0])
-    r20 = float(rp_data['return_period_20'].values[0])
-    # r25 = float(rp_data['return_period_25'].values[0])
-    # r50 = float(rp_data['return_period_50'].values[0])
-    # r100 = float(rp_data['return_period_100'].values[0])
+    r25 = float(rp_data['return_period_25'].values[0])
+    r50 = float(rp_data['return_period_50'].values[0])
+    r100 = float(rp_data['return_period_100'].values[0])
 
     # then compare the timeseries to the return period thresholds
     if max_flow >= r2:
@@ -67,29 +68,29 @@ def check_for_return_period_flow(largeflows_df, forecasted_flows_df, stream_orde
         return largeflows_df
 
     # check the rest of the return period flow levels
+    if max_flow >= r5:
+        date_r5 = get_time_of_first_exceedence(forecasted_flows_df, r5)
     if max_flow >= r10:
         date_r10 = get_time_of_first_exceedence(forecasted_flows_df, r10)
-    if max_flow >= r20:
-        date_r20 = get_time_of_first_exceedence(forecasted_flows_df, r20)
-    # if max_flow >= r25:
-    #     date_r25 = get_time_of_first_exceedence(forecasted_flows_df, r25)
-    # if max_flow >= r50:
-    #     date_r50 = get_time_of_first_exceedence(forecasted_flows_df, r50)
-    # if max_flow >= r100:
-    #     date_r100 = get_time_of_first_exceedence(forecasted_flows_df, r100)
+    if max_flow >= r25:
+        date_r25 = get_time_of_first_exceedence(forecasted_flows_df, r25)
+    if max_flow >= r50:
+        date_r50 = get_time_of_first_exceedence(forecasted_flows_df, r50)
+    if max_flow >= r100:
+        date_r100 = get_time_of_first_exceedence(forecasted_flows_df, r100)
 
     return largeflows_df.append({
         'comid': rp_data.index[0],
         'stream_order': stream_order,
         'stream_lat': float(rp_data['lat'].values),
         'stream_lon': float(rp_data['lon'].values),
-        'max_flow': max_flow,
+        'max_forecasted_flow': round(max_flow, 2),
         'date_r2': date_r2,
+        'date_r5': date_r5,
         'date_r10': date_r10,
-        'date_r20': date_r20,
-        # 'date_r25': date_r25,
-        # 'date_r50': date_r50,
-        # 'date_r100': date_r100,
+        'date_r25': date_r25,
+        'date_r50': date_r50,
+        'date_r100': date_r100,
     }, ignore_index=True)
 
 
@@ -107,8 +108,8 @@ def postprocess_region(region, rapidio, historical_sim, forecast_records):
 
     # make the pandas dataframe to store the summary info
     largeflows = pd.DataFrame(columns=[
-        'comid', 'stream_order', 'stream_lat', 'stream_lon', 'max_flow', 'date_r2', 'date_r10', 'date_r20'])
-    # , 'date_r25', 'date_r50', 'date_r100'])
+        'comid', 'stream_order', 'stream_lat', 'stream_lon', 'max_forecasted_flow', 'date_r2', 'date_r5', 'date_r10',
+        'date_r25', 'date_r50', 'date_r100'])
 
     # merge the most recent forecast files into a single xarray dataset
     logging.info('  merging forecasts')
@@ -123,7 +124,7 @@ def postprocess_region(region, rapidio, historical_sim, forecast_records):
 
     # read the return period file
     logging.info('  reading return period file')
-    return_period_file = glob.glob(os.path.join(historical_sim, region, '*return_periods_erai*.nc*'))[0]
+    return_period_file = os.path.join(historical_sim, region, 'gumbel_return_periods.nc')
     return_period_data = xarray.open_dataset(return_period_file).to_dataframe()
 
     # read the list of large streams
