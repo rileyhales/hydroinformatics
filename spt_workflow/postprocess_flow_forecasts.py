@@ -85,12 +85,12 @@ def check_for_return_period_flow(largeflows_df, forecasted_flows_df, stream_orde
         'stream_lat': float(rp_data['lat'].values),
         'stream_lon': float(rp_data['lon'].values),
         'max_forecasted_flow': round(max_flow, 2),
-        'date_r2': date_r2,
-        'date_r5': date_r5,
-        'date_r10': date_r10,
-        'date_r25': date_r25,
-        'date_r50': date_r50,
-        'date_r100': date_r100,
+        'date_exceeds_return_period_2': date_r2,
+        'date_exceeds_return_period_5': date_r5,
+        'date_exceeds_return_period_10': date_r10,
+        'date_exceeds_return_period_25': date_r25,
+        'date_exceeds_return_period_50': date_r50,
+        'date_exceeds_return_period_100': date_r100,
     }, ignore_index=True)
 
 
@@ -108,8 +108,9 @@ def postprocess_region(region, rapidio, historical_sim, forecast_records):
 
     # make the pandas dataframe to store the summary info
     largeflows = pd.DataFrame(columns=[
-        'comid', 'stream_order', 'stream_lat', 'stream_lon', 'max_forecasted_flow', 'date_r2', 'date_r5', 'date_r10',
-        'date_r25', 'date_r50', 'date_r100'])
+        'comid', 'stream_order', 'stream_lat', 'stream_lon', 'max_forecasted_flow', 'date_exceeds_return_period_2',
+        'date_exceeds_return_period_5', 'date_exceeds_return_period_10', 'date_exceeds_return_period_25',
+        'date_exceeds_return_period_50', 'date_exceeds_return_period_100'])
 
     # merge the most recent forecast files into a single xarray dataset
     logging.info('  merging forecasts')
