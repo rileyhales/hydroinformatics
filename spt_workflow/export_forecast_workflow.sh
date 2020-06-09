@@ -31,4 +31,4 @@ touch /home/byuhi/shared-output/all_regions_completed.txt
 
 # post process a csv of the return period level flows in each region and save the median flows to forecast records
 source /home/byuhi/miniconda2/etc/profile.d/conda.sh; conda activate postprocessing
-python /home/byuhi/scripts/postprocess_flow_forecasts.py ~/rapid-io ~/era_interim ~/forecast-records ~/postprocess-logs
+python /home/byuhi/scripts/postprocess_flow_forecasts.py ~/rapid-io ~/era_5 ~/forecast-records ~/postprocess-logs
