@@ -79,11 +79,17 @@ def check_for_return_period_flow(largeflows_df, forecasted_flows_df, stream_orde
     if max_flow >= r100:
         date_r100 = get_time_of_first_exceedence(forecasted_flows_df, r100)
 
+    try:
+        lat = float(rp_data['lat'].values)
+        lon = float(rp_data['lon'].values)
+    except:
+        lat = ''
+        lon = ''
     return largeflows_df.append({
         'comid': rp_data.index[0],
         'stream_order': stream_order,
-        'stream_lat': float(rp_data['lat'].values),
-        'stream_lon': float(rp_data['lon'].values),
+        'stream_lat': lat,
+        'stream_lon': lon,
         'max_forecasted_flow': round(max_flow, 2),
         'date_exceeds_return_period_2': date_r2,
         'date_exceeds_return_period_5': date_r5,
@@ -241,7 +247,7 @@ if __name__ == '__main__':
     logs_dir = sys.argv[4]
 
     # list of regions to be processed based on their forecasts
-    regions = os.listdir(os.path.join(rapidio, 'input'))
+    regions = os.listdir(os.path.join(rapidio, 'output'))
 
     # start logging
     start = datetime.datetime.now()
