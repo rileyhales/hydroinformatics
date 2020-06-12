@@ -1,4 +1,3 @@
-import pandas as pd
 import glob
 import xarray
 import numpy as np
@@ -18,5 +17,5 @@ for region in os.listdir(output_folder):
         qout_datasets.append(xarray.open_dataset(forecast_nc).Qout)
     ds = xarray.concat(qout_datasets, pd.Index(ensemble_index_list, name='ensemble'))
     qinit_path = os.path.join(output_folder, region, '20200610.0', 'Qinit_20200610t00.csv')
-    pd.DataFrame(np.nanmean(ds.data[:, :, 23], axis=0)).to_csv(qinit_path, index=False, header=False)
+    pd.DataFrame(np.nanmean(ds.data[:, :, 24], axis=0)[::-1]).to_csv(qinit_path, index=False, header=False)
     print(f'finished {region}')
