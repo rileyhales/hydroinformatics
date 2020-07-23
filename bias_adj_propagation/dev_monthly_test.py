@@ -1,4 +1,6 @@
 from io import StringIO
+import math
+import statistics
 
 import geoglows
 import numpy as np
@@ -83,10 +85,22 @@ def get_scalar_bias_fdc(first_series, seconds_series):
     return scalars_df
 
 
+def solve_gumbel_flow(std, xbar, rp):
+    """
+    Solves the Gumbel Type I pdf = exp(-exp(-b))
+    where b is the covariate
+    """
+    # xbar = statistics.mean(year_max_flow_list)
+    # std = statistics.stdev(year_max_flow_list, xbar=xbar)
+    return -math.log(-math.log(1 - (1 / rp))) * std * .7797 + xbar - (.45 * std)
+
+
 def propagate_correction(sim_data: pd.DataFrame, obs_data: pd.DataFrame, sim_data_to_correct,
                          drop_outliers: bool = False, outlier_threshold: int or float = 2.5,
-                         filter_scalar_fdc: bool = True, fdc_range: tuple = (10, 90),
-                         extrapolate_method: str = 'nearest') -> pd.DataFrame:
+                         filter_scalar_fdc: bool = False, filter_scalar_fdc_range: tuple = (0, 80),
+                         # fill_scalar_fdc: bool = False, fill_scalar_method: str = 'gumbel',
+                         extrapolate_method: str = 'nearest', fill_value: int or float = None,
+                         use_gumbel: bool = False, gumbel_max: int = 75) -> pd.DataFrame:
     # list of the unique months in the historical simulation. should always be 1->12 but just in case...
     unique_simulation_months = sorted(set(sim_data.index.strftime('%m')))
     dates = []
@@ -115,13 +129,34 @@ def propagate_correction(sim_data: pd.DataFrame, obs_data: pd.DataFrame, sim_dat
         scalar_fdc = get_scalar_bias_fdc(mon_obs_fdc['Flow'].values.flatten(), mon_sim_fdc['Flow'].values.flatten())
 
         if filter_scalar_fdc:
-            scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] >= fdc_range[0]]
-            scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] <= fdc_range[1]]
+            scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] >= filter_scalar_fdc_range[0]]
+            scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] <= filter_scalar_fdc_range[1]]
 
-        # create the interpolator for the month
+            # todo this is a good idea but not developed yet
+            # if fill_scalar_fdc:
+            #     if fill_scalar_method == 'gumbel':
+            #         xbar = statistics.mean(scalar_fdc['Scalars'].tolist())
+            #         print(xbar)
+            #         std = statistics.stdev(scalar_fdc['Scalars'].tolist(), xbar)
+            #         print(scalar_fdc)
+            #         for i in range(filter_scalar_fdc_range[1], 100):
+            #             rp = 100 / (100 - i)
+            #             new_scalar = solve_gumbel_flow(std, xbar, rp)
+            #             print(i)
+            #             print(rp)
+            #             print(new_scalar)
+            #             exit()
+
+        # todo add a flag for saving this
+        scalar_fdc.to_csv(f'scalar_fdc_{month}.csv')
+
+        # Convert the percentiles
         if extrapolate_method == 'nearest':
             to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
                                              fill_value='extrapolate', kind='nearest')
+        elif extrapolate_method == 'value':
+            to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
+                                             fill_value=fill_value, bounds_error=False)
         elif extrapolate_method == 'linear':
             to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
                                              fill_value='extrapolate')
@@ -153,14 +188,26 @@ def propagate_correction(sim_data: pd.DataFrame, obs_data: pd.DataFrame, sim_dat
         x = monthly_cor.values.flatten()
         percentiles = [stats.percentileofscore(x, a) for a in x]
         scalars = to_scalar(percentiles)
+        value = monthly_cor.values.flatten() * scalars
+
+        if use_gumbel:
+            tmp = pd.DataFrame(np.transpose([value, percentiles]), columns=('q', 'p'))
+            xbar = statistics.mean(tmp[tmp['p'] < gumbel_max]['q'].tolist())
+            std = statistics.stdev(tmp[tmp['p'] < gumbel_max]['q'].tolist(), xbar)
+            q = []
+            for p in tmp[tmp['p'] >= gumbel_max]['p'].tolist():
+                if p >= 100:
+                    p = 99.999
+                q.append(solve_gumbel_flow(std, xbar, 1 / (1 - (p / 100))))
+            tmp.loc[tmp['p'] >= gumbel_max, 'q'] = q
+            value = tmp['q'].values
 
         dates += monthly_sim.index.to_list()
-        # value = np.divide(monthly_cor.values.flatten(), scalars)
-        value = monthly_cor.values.flatten() * scalars
         values += value.tolist()
         scales += scalars.tolist()
         percents += percentiles
 
+    # values = np.multiply(values, 1.075)
     df_data = np.transpose([values, scales, percents])
     columns = ['Propagated Corrected Streamflow', 'Scalars', 'MonthlyPercentile']
     corrected = pd.DataFrame(data=df_data, index=dates, columns=columns)
@@ -239,7 +286,7 @@ def make_stats_summary(df1, df2, df3, df4, df5, df6, labels):
 
 
 # collect_data(9017261, 32037030, 9015333, 32097010)
-collect_data(9012999, 22057070, 9012650, 22057010)
+# collect_data(9012999, 22057070, 9012650, 22057010)
 
 # Read all as csv
 start_flow = pd.read_csv('start_flow.csv', index_col=0)
@@ -259,37 +306,42 @@ downstream_bc_flow.index = pd.to_datetime(downstream_bc_flow.index)
 
 methods = ('nearest', 'linear', 'min', 'globalmin', 'average', 'globalaverage')
 
-stats_dfs = []
-for extrap_met in methods:
-    downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
-                                                   drop_outliers=True, outlier_threshold=1,
-                                                   extrapolate_method=extrap_met)
-    # plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
-    #              f'Correct Monthly - Drop input outliers @ 1z, {extrap_met} extrapolation')
-    del downstream_prop_correct['Scalars'], downstream_prop_correct['MonthlyPercentile']
-    stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
-make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_drop_outliers.csv')
+# stats_dfs = []
+# for extrap_met in methods:
+#     downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
+#                                                    drop_outliers=True, outlier_threshold=1,
+#                                                    extrapolate_method=extrap_met)
+#     plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
+#                  f'Correct Monthly - Drop input outliers @ 1z, {extrap_met} extrapolation')
+#     del downstream_prop_correct['Scalars'], downstream_prop_correct['MonthlyPercentile']
+#     stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
+# make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_drop_outliers.csv')
 
+# stats_dfs = []
+# for extrap_met in methods:
+#     downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
+#                                                    drop_outliers=True, outlier_threshold=1,
+#                                                    extrapolate_method=extrap_met)
+#     plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
+#                  f'Correct Monthly - Using the middle of the scalar fdc (10-90%), {extrap_met} extrapolation')
+#     del downstream_prop_correct['Scalars'], downstream_prop_correct['MonthlyPercentile']
+#     stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
+# make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_middle_1090_scalars.csv')
 
-stats_dfs = []
-for extrap_met in methods:
-    downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
-                                                   drop_outliers=True, outlier_threshold=1,
-                                                   extrapolate_method=extrap_met)
-    plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
-                 f'Correct Monthly - Using the middle of the scalar fdc (10-90%), {extrap_met} extrapolation')
-    del downstream_prop_correct['Scalars'], downstream_prop_correct['MonthlyPercentile']
-    stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
-make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_middle_1090_scalars.csv')
+# stats_dfs = []
+# for extrap_met in methods:
+#     downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
+#                                                    drop_outliers=True, outlier_threshold=1,
+#                                                    extrapolate_method=extrap_met)
+#     plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
+#                  f'Correct Monthly - Using the middle of the scalar fdc (10-80%), {extrap_met} extrapolation')
+#     del downstream_prop_correct['Scalars'], downstream_prop_correct['MonthlyPercentile']
+#     stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
+# make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_middle_1080_scalars.csv')
 
-
-stats_dfs = []
-for extrap_met in methods:
-    downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
-                                                   drop_outliers=True, outlier_threshold=1,
-                                                   extrapolate_method=extrap_met)
-    # plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
-    #              f'Correct Monthly - Using the middle of the scalar fdc (10-80%), {extrap_met} extrapolation')
-    del downstream_prop_correct['Scalars'], downstream_prop_correct['MonthlyPercentile']
-    stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
-make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_middle_1080_scalars.csv')
+downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
+                                               use_gumbel=True, gumbel_max=75)
+plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct, f'Correct Monthly - Fill value of 1')
+del downstream_prop_correct['Scalars']
+del downstream_prop_correct['MonthlyPercentile']
+statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow).to_csv('stats_test.csv')
