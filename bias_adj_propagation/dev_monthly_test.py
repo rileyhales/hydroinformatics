@@ -132,21 +132,6 @@ def propagate_correction(sim_data: pd.DataFrame, obs_data: pd.DataFrame, sim_dat
             scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] >= filter_scalar_fdc_range[0]]
             scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] <= filter_scalar_fdc_range[1]]
 
-            # todo this is a good idea but not developed yet
-            # if fill_scalar_fdc:
-            #     if fill_scalar_method == 'gumbel':
-            #         xbar = statistics.mean(scalar_fdc['Scalars'].tolist())
-            #         print(xbar)
-            #         std = statistics.stdev(scalar_fdc['Scalars'].tolist(), xbar)
-            #         print(scalar_fdc)
-            #         for i in range(filter_scalar_fdc_range[1], 100):
-            #             rp = 100 / (100 - i)
-            #             new_scalar = solve_gumbel_flow(std, xbar, rp)
-            #             print(i)
-            #             print(rp)
-            #             print(new_scalar)
-            #             exit()
-
         # todo add a flag for saving this
         scalar_fdc.to_csv(f'scalar_fdc_{month}.csv')
 
