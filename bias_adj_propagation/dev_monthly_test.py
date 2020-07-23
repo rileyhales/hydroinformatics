@@ -1,17 +1,17 @@
-from io import StringIO
 import math
-import statistics
 import os
+import statistics
+from io import StringIO
 
 import geoglows
+import hydrostats as hs
+import hydrostats.data as hd
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import requests
 from scipy import interpolate
 from scipy import stats
-import hydrostats as hs
-import hydrostats.data as hd
 
 
 def collect_data(start_id, start_ideam_id, downstream_id, downstream_ideam_id):
@@ -99,10 +99,10 @@ def solve_gumbel_flow(std, xbar, rp):
 def propagate_correction(sim_data_a: pd.DataFrame, obs_data_a: pd.DataFrame, sim_data_b,
                          fix_seasonaly: bool = True, seasonality: str = 'monthly',
                          drop_outliers: bool = False, outlier_threshold: int or float = 2.5,
-                         filter_scalar_fdc: bool = False, filter_scalar_fdc_range: tuple = (0, 80),
+                         filter_scalar_fdc: bool = False, filter_range: tuple = (0, 80),
                          export_scalar_fdc: bool = False, scalar_fdc_dir: str = None,
                          extrapolate_method: str = 'nearest', fill_value: int or float = None,
-                         apply_gumbel: bool = False, gumbel_max: int = 75, ) -> pd.DataFrame:
+                         apply_gumbel: bool = False, gumbel_range: tuple = (25, 75), ) -> pd.DataFrame:
     if fix_seasonaly:
         if seasonality == 'monthly':
             # list of the unique months in the historical simulation. should always be 1->12 but just in case...
@@ -112,20 +112,35 @@ def propagate_correction(sim_data_a: pd.DataFrame, obs_data_a: pd.DataFrame, sim
                 mon_sim_data = sim_data_a[sim_data_a.index.month == int(month)].dropna()
                 mon_obs_data = obs_data_a[obs_data_a.index.month == int(month)].dropna()
                 mon_cor_data = sim_data_b[sim_data_b.index.month == int(month)].dropna()
-                monthly_results.append(
-                    propagate_correction(
-                        mon_sim_data, mon_obs_data, mon_cor_data,
-                        fix_seasonaly=False, seasonality=seasonality,
-                        drop_outliers=drop_outliers, outlier_threshold=outlier_threshold,
-                        filter_scalar_fdc=filter_scalar_fdc, filter_scalar_fdc_range=filter_scalar_fdc_range,
-                        export_scalar_fdc=export_scalar_fdc, scalar_fdc_dir=scalar_fdc_dir,
-                        extrapolate_method=extrapolate_method, fill_value=fill_value,
-                        apply_gumbel=apply_gumbel, gumbel_max=gumbel_max,
-                    )
+                monthly_results.append(propagate_correction(
+                    mon_sim_data, mon_obs_data, mon_cor_data,
+                    fix_seasonaly=False, seasonality=seasonality,
+                    drop_outliers=drop_outliers, outlier_threshold=outlier_threshold,
+                    filter_scalar_fdc=filter_scalar_fdc, filter_range=filter_range,
+                    export_scalar_fdc=export_scalar_fdc, scalar_fdc_dir=scalar_fdc_dir,
+                    extrapolate_method=extrapolate_method, fill_value=fill_value,
+                    apply_gumbel=apply_gumbel, gumbel_range=gumbel_range, )
                 )
-            df = pd.concat(monthly_results)
-            df.sort_index(inplace=True)
-            return df
+            # combine the results from each monthy into a single dataframe (sorted chronologically) and return it
+            return pd.concat(monthly_results).sort_index()
+        elif isinstance(seasonality, list) or isinstance(seasonality, tuple):
+            # list of the unique months in the historical simulation. should always be 1->12 but just in case...
+            seasonal_results = []
+            for season in seasonality:
+                # filter data to only be current iteration's month
+                mon_sim_data = sim_data_a[sim_data_a.index.month.isin(season)].dropna()
+                mon_obs_data = obs_data_a[obs_data_a.index.month.isin(season)].dropna()
+                mon_cor_data = sim_data_b[sim_data_b.index.month.isin(season)].dropna()
+                seasonal_results.append(propagate_correction(
+                    mon_sim_data, mon_obs_data, mon_cor_data,
+                    fix_seasonaly=False, seasonality='monthly',
+                    drop_outliers=drop_outliers, outlier_threshold=outlier_threshold,
+                    filter_scalar_fdc=filter_scalar_fdc, filter_range=filter_range,
+                    export_scalar_fdc=export_scalar_fdc, scalar_fdc_dir=scalar_fdc_dir,
+                    extrapolate_method=extrapolate_method, fill_value=fill_value,
+                    apply_gumbel=apply_gumbel, gumbel_range=gumbel_range, )
+                )
+            return pd.concat(seasonal_results).sort_index()
 
     # compute the fdc for paired sim/obs data and compute scalar fdc, either with or without outliers
     if drop_outliers:
@@ -142,8 +157,8 @@ def propagate_correction(sim_data_a: pd.DataFrame, obs_data_a: pd.DataFrame, sim
     scalar_fdc = get_scalar_bias_fdc(obs_fdc['Flow'].values.flatten(), sim_fdc['Flow'].values.flatten())
 
     if filter_scalar_fdc:
-        scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] >= filter_scalar_fdc_range[0]]
-        scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] <= filter_scalar_fdc_range[1]]
+        scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] >= filter_range[0]]
+        scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] <= filter_range[1]]
 
     if export_scalar_fdc:
         scalar_fdc.to_csv(os.path.join(scalar_fdc_dir, 'scalar_fdc.csv'))
@@ -167,42 +182,41 @@ def propagate_correction(sim_data_a: pd.DataFrame, obs_data_a: pd.DataFrame, sim
     elif extrapolate_method == 'min' or extrapolate_method == 'minimum':
         to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
                                          fill_value=np.min(scalar_fdc.values[:, 1]), bounds_error=False)
-    elif extrapolate_method == 'globalmin':
-        total_scalar_fdc = get_scalar_bias_fdc(
-            compute_flow_duration_curve(obs_data_a.values.flatten()),
-            compute_flow_duration_curve(sim_data_a.values.flatten()))
-        to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
-                                         fill_value=np.min(total_scalar_fdc.values[:, 1]), bounds_error=False)
-    elif extrapolate_method == 'globalaverage':
-        total_scalar_fdc = get_scalar_bias_fdc(
-            compute_flow_duration_curve(obs_data_a.values.flatten()),
-            compute_flow_duration_curve(sim_data_a.values.flatten()))
-        to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
-                                         fill_value=np.mean(total_scalar_fdc.values[:, 1]), bounds_error=False)
     else:
         raise ValueError('Invalid extrapolation method provided')
 
     # determine the percentile of each uncorrected flow using the monthly fdc
-    x = sim_data_b.values.flatten()
-    percentiles = [stats.percentileofscore(x, a) for a in x]
+    values = sim_data_b.values.flatten()
+    percentiles = [stats.percentileofscore(values, a) for a in values]
     scalars = to_scalar(percentiles)
-    values = x * scalars
+    values = values * scalars
 
     if apply_gumbel:
         tmp = pd.DataFrame(np.transpose([values, percentiles]), columns=('q', 'p'))
-        xbar = statistics.mean(tmp[tmp['p'] < gumbel_max]['q'].tolist())
-        std = statistics.stdev(tmp[tmp['p'] < gumbel_max]['q'].tolist(), xbar)
+
+        # compute the average and standard deviation except for scaled data outside the percentile range specified
+        mid = tmp[tmp['p'] > gumbel_range[0]]
+        mid = mid[mid['p'] < gumbel_range[1]]
+        xbar = statistics.mean(mid['q'].tolist())
+        std = statistics.stdev(mid['q'].tolist(), xbar)
+
         q = []
-        for p in tmp[tmp['p'] >= gumbel_max]['p'].tolist():
+        for p in tmp[tmp['p'] <= gumbel_range[0]]['p'].tolist():
+            q.append(solve_gumbel_flow(std, xbar, 1 / (1 - (p / 100))))
+        tmp.loc[tmp['p'] <= gumbel_range[0], 'q'] = q
+
+        q = []
+        for p in tmp[tmp['p'] >= gumbel_range[1]]['p'].tolist():
             if p >= 100:
                 p = 99.999
             q.append(solve_gumbel_flow(std, xbar, 1 / (1 - (p / 100))))
-        tmp.loc[tmp['p'] >= gumbel_max, 'q'] = q
+        tmp.loc[tmp['p'] >= gumbel_range[1], 'q'] = q
+
         values = tmp['q'].values
 
-    df_data = np.transpose([values, scalars, percentiles])
-    columns = ['Propagated Corrected Streamflow', 'Scalars', 'Monthly Percentile']
-    corrected = pd.DataFrame(data=df_data, index=sim_data_a.index.to_list(), columns=columns)
+    corrected = pd.DataFrame(data=np.transpose([values, scalars, percentiles]),
+                             index=sim_data_b.index.to_list(),
+                             columns=('Propagated Corrected Streamflow', 'Scalars', 'Percentile'))
     corrected.sort_index(inplace=True)
     return corrected
 
@@ -233,7 +247,7 @@ def plot_results(sim, obs, bc, bcp, title):
         go.Scatter(
             name='Percentile',
             x=sim_dates,
-            y=bcp['Monthly Percentile'].values.flatten(),
+            y=bcp['Percentile'].values.flatten(),
         ),
         go.Scatter(
             name='Scalar',
@@ -263,22 +277,10 @@ def statistics_tables(corrected: pd.DataFrame, simulated: pd.DataFrame, observed
     return pd.merge(table1, table2, right_index=True, left_index=True)
 
 
-def make_stats_summary(df1, df2, df3, df4, df5, df6, labels):
-    data = np.transpose((
-        df1['Original Full Time Series'],
-        df1['Corrected Full Time Series'],
-        df2['Corrected Full Time Series'],
-        df3['Corrected Full Time Series'],
-        df4['Corrected Full Time Series'],
-        df5['Corrected Full Time Series'],
-        df6['Corrected Full Time Series'],
-    ))
-    columns = ['Sim v Obs'] + list(labels)
-    return pd.DataFrame(data, columns=columns, index=df1.index)
-
-
-# collect_data(9017261, 32037030, 9015333, 32097010)
 # collect_data(9012999, 22057070, 9012650, 22057010)
+# collect_data(9017261, 32037030, 9015333, 32097010)  # really long range down stream
+# collect_data(9009660, 21237020, 9007292, 23097040)  # large river
+# collect_data(9007292, 23097040, 9009660, 21237020)  # large river backwards (going upstream)
 
 # Read all as csv
 start_flow = pd.read_csv('start_flow.csv', index_col=0)
@@ -292,48 +294,10 @@ downstream_flow.index = pd.to_datetime(downstream_flow.index)
 downstream_ideam_flow.index = pd.to_datetime(downstream_ideam_flow.index)
 downstream_bc_flow.index = pd.to_datetime(downstream_bc_flow.index)
 
-# downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow)
-# plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct, 'Correct Monthly')
-
-methods = ('nearest', 'linear', 'min', 'globalmin', 'average', 'globalaverage')
-
-# stats_dfs = []
-# for extrap_met in methods:
-#     downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
-#                                                    drop_outliers=True, outlier_threshold=1,
-#                                                    extrapolate_method=extrap_met)
-#     plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
-#                  f'Correct Monthly - Drop input outliers @ 1z, {extrap_met} extrapolation')
-#     del downstream_prop_correct['Scalars'], downstream_prop_correct['Monthly Percentile']
-#     stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
-# make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_drop_outliers.csv')
-
-# stats_dfs = []
-# for extrap_met in methods:
-#     downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
-#                                                    drop_outliers=True, outlier_threshold=1,
-#                                                    extrapolate_method=extrap_met)
-#     plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
-#                  f'Correct Monthly - Using the middle of the scalar fdc (10-90%), {extrap_met} extrapolation')
-#     del downstream_prop_correct['Scalars'], downstream_prop_correct['Monthly Percentile']
-#     stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
-# make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_middle_1090_scalars.csv')
-
-# stats_dfs = []
-# for extrap_met in methods:
-#     downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
-#                                                    drop_outliers=True, outlier_threshold=1,
-#                                                    extrapolate_method=extrap_met)
-#     plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
-#                  f'Correct Monthly - Using the middle of the scalar fdc (10-80%), {extrap_met} extrapolation')
-#     del downstream_prop_correct['Scalars'], downstream_prop_correct['Monthly Percentile']
-#     stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
-# make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_middle_1080_scalars.csv')
 
 downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
-                                               apply_gumbel=True, gumbel_max=75)
+                                               apply_gumbel=True, gumbel_range=(25, 75))
 plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
-             f'Correct Monthly - Fill value of 1')
-del downstream_prop_correct['Scalars']
-del downstream_prop_correct['Monthly Percentile']
+             f'Correct Monthly - Force Gumbel Distribution')
+del downstream_prop_correct['Scalars'], downstream_prop_correct['Percentile']
 statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow).to_csv('stats_test.csv')
