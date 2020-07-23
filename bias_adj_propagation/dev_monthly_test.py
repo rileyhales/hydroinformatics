@@ -1,6 +1,7 @@
 from io import StringIO
 import math
 import statistics
+import os
 
 import geoglows
 import numpy as np
@@ -95,107 +96,113 @@ def solve_gumbel_flow(std, xbar, rp):
     return -math.log(-math.log(1 - (1 / rp))) * std * .7797 + xbar - (.45 * std)
 
 
-def propagate_correction(sim_data: pd.DataFrame, obs_data: pd.DataFrame, sim_data_to_correct,
+def propagate_correction(sim_data_a: pd.DataFrame, obs_data_a: pd.DataFrame, sim_data_b,
+                         fix_seasonaly: bool = True, seasonality: str = 'monthly',
                          drop_outliers: bool = False, outlier_threshold: int or float = 2.5,
                          filter_scalar_fdc: bool = False, filter_scalar_fdc_range: tuple = (0, 80),
-                         # fill_scalar_fdc: bool = False, fill_scalar_method: str = 'gumbel',
+                         export_scalar_fdc: bool = False, scalar_fdc_dir: str = None,
                          extrapolate_method: str = 'nearest', fill_value: int or float = None,
-                         use_gumbel: bool = False, gumbel_max: int = 75) -> pd.DataFrame:
-    # list of the unique months in the historical simulation. should always be 1->12 but just in case...
-    unique_simulation_months = sorted(set(sim_data.index.strftime('%m')))
-    dates = []
-    values = []
-    scales = []
-    percents = []
+                         apply_gumbel: bool = False, gumbel_max: int = 75, ) -> pd.DataFrame:
+    if fix_seasonaly:
+        if seasonality == 'monthly':
+            # list of the unique months in the historical simulation. should always be 1->12 but just in case...
+            monthly_results = []
+            for month in sorted(set(sim_data_a.index.strftime('%m'))):
+                # filter data to only be current iteration's month
+                mon_sim_data = sim_data_a[sim_data_a.index.month == int(month)].dropna()
+                mon_obs_data = obs_data_a[obs_data_a.index.month == int(month)].dropna()
+                mon_cor_data = sim_data_b[sim_data_b.index.month == int(month)].dropna()
+                monthly_results.append(
+                    propagate_correction(
+                        mon_sim_data, mon_obs_data, mon_cor_data,
+                        fix_seasonaly=False, seasonality=seasonality,
+                        drop_outliers=drop_outliers, outlier_threshold=outlier_threshold,
+                        filter_scalar_fdc=filter_scalar_fdc, filter_scalar_fdc_range=filter_scalar_fdc_range,
+                        export_scalar_fdc=export_scalar_fdc, scalar_fdc_dir=scalar_fdc_dir,
+                        extrapolate_method=extrapolate_method, fill_value=fill_value,
+                        apply_gumbel=apply_gumbel, gumbel_max=gumbel_max,
+                    )
+                )
+            df = pd.concat(monthly_results)
+            df.sort_index(inplace=True)
+            return df
 
-    for month in unique_simulation_months:
-        # filter data to only be current iteration's month
-        monthly_sim = sim_data[sim_data.index.month == int(month)].dropna()
-        monthly_obs = obs_data[obs_data.index.month == int(month)].dropna()
-        monthly_cor = sim_data_to_correct[sim_data_to_correct.index.month == int(month)].dropna()
+    # compute the fdc for paired sim/obs data and compute scalar fdc, either with or without outliers
+    if drop_outliers:
+        # drop outlier data
+        # https://stackoverflow.com/questions/23199796/detect-and-exclude-outliers-in-pandas-data-frame
+        sim_fdc = compute_flow_duration_curve(
+            sim_data_a[(np.abs(stats.zscore(sim_data_a)) < outlier_threshold).all(axis=1)])
+        obs_fdc = compute_flow_duration_curve(
+            obs_data_a[(np.abs(stats.zscore(obs_data_a)) < outlier_threshold).all(axis=1)])
+    else:
+        sim_fdc = compute_flow_duration_curve(sim_data_a)
+        obs_fdc = compute_flow_duration_curve(obs_data_a)
 
-        # compute the fdc for paired sim/obs data and compute scalar fdc, either with or without outliers
-        if drop_outliers:
-            # drop outlier data
-            # https://stackoverflow.com/questions/23199796/detect-and-exclude-outliers-in-pandas-data-frame
-            mon_sim_fdc = compute_flow_duration_curve(
-                monthly_sim[(np.abs(stats.zscore(monthly_sim)) < outlier_threshold).all(axis=1)])
-            mon_obs_fdc = compute_flow_duration_curve(
-                monthly_obs[(np.abs(stats.zscore(monthly_obs)) < outlier_threshold).all(axis=1)])
-        else:
-            mon_sim_fdc = compute_flow_duration_curve(monthly_sim)
-            mon_obs_fdc = compute_flow_duration_curve(monthly_obs)
+    scalar_fdc = get_scalar_bias_fdc(obs_fdc['Flow'].values.flatten(), sim_fdc['Flow'].values.flatten())
 
-        scalar_fdc = get_scalar_bias_fdc(mon_obs_fdc['Flow'].values.flatten(), mon_sim_fdc['Flow'].values.flatten())
+    if filter_scalar_fdc:
+        scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] >= filter_scalar_fdc_range[0]]
+        scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] <= filter_scalar_fdc_range[1]]
 
-        if filter_scalar_fdc:
-            scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] >= filter_scalar_fdc_range[0]]
-            scalar_fdc = scalar_fdc[scalar_fdc['Exceedence Probability'] <= filter_scalar_fdc_range[1]]
+    if export_scalar_fdc:
+        scalar_fdc.to_csv(os.path.join(scalar_fdc_dir, 'scalar_fdc.csv'))
 
-        # todo add a flag for saving this
-        scalar_fdc.to_csv(f'scalar_fdc_{month}.csv')
+    # Convert the percentiles
+    if extrapolate_method == 'nearest':
+        to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
+                                         fill_value='extrapolate', kind='nearest')
+    elif extrapolate_method == 'value':
+        to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
+                                         fill_value=fill_value, bounds_error=False)
+    elif extrapolate_method == 'linear':
+        to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
+                                         fill_value='extrapolate')
+    elif extrapolate_method == 'average':
+        to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
+                                         fill_value=np.mean(scalar_fdc.values[:, 1]), bounds_error=False)
+    elif extrapolate_method == 'max' or extrapolate_method == 'maximum':
+        to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
+                                         fill_value=np.max(scalar_fdc.values[:, 1]), bounds_error=False)
+    elif extrapolate_method == 'min' or extrapolate_method == 'minimum':
+        to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
+                                         fill_value=np.min(scalar_fdc.values[:, 1]), bounds_error=False)
+    elif extrapolate_method == 'globalmin':
+        total_scalar_fdc = get_scalar_bias_fdc(
+            compute_flow_duration_curve(obs_data_a.values.flatten()),
+            compute_flow_duration_curve(sim_data_a.values.flatten()))
+        to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
+                                         fill_value=np.min(total_scalar_fdc.values[:, 1]), bounds_error=False)
+    elif extrapolate_method == 'globalaverage':
+        total_scalar_fdc = get_scalar_bias_fdc(
+            compute_flow_duration_curve(obs_data_a.values.flatten()),
+            compute_flow_duration_curve(sim_data_a.values.flatten()))
+        to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
+                                         fill_value=np.mean(total_scalar_fdc.values[:, 1]), bounds_error=False)
+    else:
+        raise ValueError('Invalid extrapolation method provided')
 
-        # Convert the percentiles
-        if extrapolate_method == 'nearest':
-            to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
-                                             fill_value='extrapolate', kind='nearest')
-        elif extrapolate_method == 'value':
-            to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
-                                             fill_value=fill_value, bounds_error=False)
-        elif extrapolate_method == 'linear':
-            to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
-                                             fill_value='extrapolate')
-        elif extrapolate_method == 'average':
-            to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
-                                             fill_value=np.mean(scalar_fdc.values[:, 1]), bounds_error=False)
-        elif extrapolate_method == 'max' or extrapolate_method == 'maximum':
-            to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
-                                             fill_value=np.max(scalar_fdc.values[:, 1]), bounds_error=False)
-        elif extrapolate_method == 'min' or extrapolate_method == 'minimum':
-            to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
-                                             fill_value=np.min(scalar_fdc.values[:, 1]), bounds_error=False)
-        elif extrapolate_method == 'globalmin':
-            total_scalar_fdc = get_scalar_bias_fdc(
-                compute_flow_duration_curve(obs_data.values.flatten()),
-                compute_flow_duration_curve(sim_data.values.flatten()))
-            to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
-                                             fill_value=np.min(total_scalar_fdc.values[:, 1]), bounds_error=False)
-        elif extrapolate_method == 'globalaverage':
-            total_scalar_fdc = get_scalar_bias_fdc(
-                compute_flow_duration_curve(obs_data.values.flatten()),
-                compute_flow_duration_curve(sim_data.values.flatten()))
-            to_scalar = interpolate.interp1d(scalar_fdc.values[:, 0], scalar_fdc.values[:, 1],
-                                             fill_value=np.mean(total_scalar_fdc.values[:, 1]), bounds_error=False)
-        else:
-            raise ValueError('Invalid extrapolation method provided')
+    # determine the percentile of each uncorrected flow using the monthly fdc
+    x = sim_data_b.values.flatten()
+    percentiles = [stats.percentileofscore(x, a) for a in x]
+    scalars = to_scalar(percentiles)
+    values = x * scalars
 
-        # determine the percentile of each uncorrected flow using the monthly fdc
-        x = monthly_cor.values.flatten()
-        percentiles = [stats.percentileofscore(x, a) for a in x]
-        scalars = to_scalar(percentiles)
-        value = monthly_cor.values.flatten() * scalars
+    if apply_gumbel:
+        tmp = pd.DataFrame(np.transpose([values, percentiles]), columns=('q', 'p'))
+        xbar = statistics.mean(tmp[tmp['p'] < gumbel_max]['q'].tolist())
+        std = statistics.stdev(tmp[tmp['p'] < gumbel_max]['q'].tolist(), xbar)
+        q = []
+        for p in tmp[tmp['p'] >= gumbel_max]['p'].tolist():
+            if p >= 100:
+                p = 99.999
+            q.append(solve_gumbel_flow(std, xbar, 1 / (1 - (p / 100))))
+        tmp.loc[tmp['p'] >= gumbel_max, 'q'] = q
+        values = tmp['q'].values
 
-        if use_gumbel:
-            tmp = pd.DataFrame(np.transpose([value, percentiles]), columns=('q', 'p'))
-            xbar = statistics.mean(tmp[tmp['p'] < gumbel_max]['q'].tolist())
-            std = statistics.stdev(tmp[tmp['p'] < gumbel_max]['q'].tolist(), xbar)
-            q = []
-            for p in tmp[tmp['p'] >= gumbel_max]['p'].tolist():
-                if p >= 100:
-                    p = 99.999
-                q.append(solve_gumbel_flow(std, xbar, 1 / (1 - (p / 100))))
-            tmp.loc[tmp['p'] >= gumbel_max, 'q'] = q
-            value = tmp['q'].values
-
-        dates += monthly_sim.index.to_list()
-        values += value.tolist()
-        scales += scalars.tolist()
-        percents += percentiles
-
-    # values = np.multiply(values, 1.075)
-    df_data = np.transpose([values, scales, percents])
-    columns = ['Propagated Corrected Streamflow', 'Scalars', 'MonthlyPercentile']
-    corrected = pd.DataFrame(data=df_data, index=dates, columns=columns)
+    df_data = np.transpose([values, scalars, percentiles])
+    columns = ['Propagated Corrected Streamflow', 'Scalars', 'Monthly Percentile']
+    corrected = pd.DataFrame(data=df_data, index=sim_data_a.index.to_list(), columns=columns)
     corrected.sort_index(inplace=True)
     return corrected
 
@@ -226,7 +233,7 @@ def plot_results(sim, obs, bc, bcp, title):
         go.Scatter(
             name='Percentile',
             x=sim_dates,
-            y=bcp['MonthlyPercentile'].values.flatten(),
+            y=bcp['Monthly Percentile'].values.flatten(),
         ),
         go.Scatter(
             name='Scalar',
@@ -285,7 +292,6 @@ downstream_flow.index = pd.to_datetime(downstream_flow.index)
 downstream_ideam_flow.index = pd.to_datetime(downstream_ideam_flow.index)
 downstream_bc_flow.index = pd.to_datetime(downstream_bc_flow.index)
 
-
 # downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow)
 # plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct, 'Correct Monthly')
 
@@ -298,7 +304,7 @@ methods = ('nearest', 'linear', 'min', 'globalmin', 'average', 'globalaverage')
 #                                                    extrapolate_method=extrap_met)
 #     plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
 #                  f'Correct Monthly - Drop input outliers @ 1z, {extrap_met} extrapolation')
-#     del downstream_prop_correct['Scalars'], downstream_prop_correct['MonthlyPercentile']
+#     del downstream_prop_correct['Scalars'], downstream_prop_correct['Monthly Percentile']
 #     stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
 # make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_drop_outliers.csv')
 
@@ -309,7 +315,7 @@ methods = ('nearest', 'linear', 'min', 'globalmin', 'average', 'globalaverage')
 #                                                    extrapolate_method=extrap_met)
 #     plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
 #                  f'Correct Monthly - Using the middle of the scalar fdc (10-90%), {extrap_met} extrapolation')
-#     del downstream_prop_correct['Scalars'], downstream_prop_correct['MonthlyPercentile']
+#     del downstream_prop_correct['Scalars'], downstream_prop_correct['Monthly Percentile']
 #     stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
 # make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_middle_1090_scalars.csv')
 
@@ -320,13 +326,14 @@ methods = ('nearest', 'linear', 'min', 'globalmin', 'average', 'globalaverage')
 #                                                    extrapolate_method=extrap_met)
 #     plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
 #                  f'Correct Monthly - Using the middle of the scalar fdc (10-80%), {extrap_met} extrapolation')
-#     del downstream_prop_correct['Scalars'], downstream_prop_correct['MonthlyPercentile']
+#     del downstream_prop_correct['Scalars'], downstream_prop_correct['Monthly Percentile']
 #     stats_dfs.append(statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow))
 # make_stats_summary(stats_dfs[0], stats_dfs[1], stats_dfs[2], stats_dfs[3], stats_dfs[4], stats_dfs[5], methods).to_csv('stats_middle_1080_scalars.csv')
 
 downstream_prop_correct = propagate_correction(start_flow, start_ideam_flow, downstream_flow,
-                                               use_gumbel=True, gumbel_max=75)
-plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct, f'Correct Monthly - Fill value of 1')
+                                               apply_gumbel=True, gumbel_max=75)
+plot_results(downstream_flow, downstream_ideam_flow, downstream_bc_flow, downstream_prop_correct,
+             f'Correct Monthly - Fill value of 1')
 del downstream_prop_correct['Scalars']
-del downstream_prop_correct['MonthlyPercentile']
+del downstream_prop_correct['Monthly Percentile']
 statistics_tables(downstream_prop_correct, downstream_flow, downstream_ideam_flow).to_csv('stats_test.csv')
